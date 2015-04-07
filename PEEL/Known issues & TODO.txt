@@ -1,0 +1,69 @@
+
+Known issues:
+------------
+
+	PEEL:
+		- phantom support is busted
+		- can't disable more than 12 engines (since keyboards only have F1 -> F12 keys)
+		- some convex objects are not rendered when the ICE convex hull code fails
+		- some "add objects" tests include in their timings the cost of creating render objects. That's not good.
+		And sometimes it also includes the cost of the PEEL plugins trying to share shapes, rather than the cost
+		of the physics engine itself. This part needs some more work.
+		
+	Bullet:
+		- ragdoll's joints are not properly setup. It works in other engines, no idea what I'm doing wrong.
+		- "convex stack 2" explodes, even with a small margin. No other engine does that so I'm sure the input data is ok. Not sure how to fix it.
+		- empty static scene perf is still a problem despite Erwin's feedback.
+		- "VeryLargeTriangle" scene crashes.
+		- SceneBoxSweepVsSingleTriangle acts very strangely
+		- SceneConvexSweepVsSingleTriangle crashes
+
+	Havok:
+		- triangles are not backface culled in raytracing tests, producing slightly unfair comparisons.
+		How do we enable backface culling there?
+		- memory usage might be incorrectly captured. Not entirely sure what's the proper way.
+		- Voronoi fracture scene acts very strangely in newer Havok versions, although the same scene & setup code works fine in older versions.
+
+	Newton:
+		- can't use 3.9 and 3.13 PEEL plugins at the same time. We should try delay loading.
+		- sleeping is not deactivated
+		- ragdoll/ragdoll collision filtering does not work
+		- deleting an object is not implemented, so the Voronoi fracture scene isn't properly setup.
+
+TODO:
+----
+
+	PEEL:
+		- revisit "add objects" scenes. Ideally we'd rely on the plugins themselves to record & report the time spent in the physics engine.
+		Or we need specialized virtual calls to do "batch adds" at runtime, while all the necessary data has been computed before (not timed).
+		- the 'SQ Profiling Mode' stuff is confusing. It would be better to replace the 'ProfileUpdate' function with just something
+		defining the preferred profiling mode for each test, while still leaving the option to override this with the UI parameter.
+		- better test scenes for actors insertion, e.g. 10000 adds while the scene already has 30K objects.
+		- add proper "mesh cooking" benchmarks
+		- add more convex sweeps scenes
+		- add support for heightfields (all engines)
+		- add support for aggregates (PhysX. Find equivalent in other engines.)
+			- this should improve performance of ragdoll scenes quite a bit (at least for PhysX)
+		- add support for character controllers. Probably quite hard to do.
+		- add support for vehicles. Probably even harder.
+		- share rendering objects between engines. This is done in very few tests, but it should be done everywhere.
+
+	Bullet:
+		- support overlaps
+		- support multithreading
+		- support 'raycast any' and 'raycast all'
+
+	Havok:
+		- support box overlaps
+		- support capsule overlaps
+		- support 'raycast any' and 'raycast all'
+
+	Newton:
+		- complete PINT plugin (sweeps, overlaps, raycast any, CCD, disable sleeping, etc, etc).
+
+	PhysX:
+		- support for convex sweeps is not implemented for all versions. Complete this.
+
+	All engines:
+		- there's a lot of common code to refactor in all the different PINT plugins
+

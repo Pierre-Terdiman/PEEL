@@ -1,0 +1,82 @@
+PEEL Release Notes
+==================
+
+PEEL was created by Pierre Terdiman (author of Opcode, co-author of NovodeX, senior software engineer for PhysX).
+
+Contact email: pierre.terdiman@gmail.com   <= use this first
+               pierre@codercorner.com      <= use this the day the first one becomes obsolete
+ 
+---
+
+* april 2015: v1.0 - first public version
+
+	- PINT_Bullet was my initial Bullet PEEL plugin, for version 2.79. It will be deprecated soon, since it
+	seems old and irrelevant now.
+
+	- the Bullet 2.81 plugin is the one which was used for my "evolution of PhysX" blog post. As I reported on
+	the Bullet forums at the time, the optimizations settings shipped with the library seem sub-optimal. In the
+	provided build, I modified the Visual Studio settings to produce a faster version (it is using the same
+	settings as what we use for PhysX).
+
+	- the Bullet 2.82 plugin uses Bullet's own optimization settings (as shipped). This is a great way to show
+	what PEEL is about, since you can run both 2.81 and 2.82 versions in the tool, and easily see the performance
+	difference between the two builds.
+
+	- the various Havok PEEL plugins are provided as source code only. The Havok license is unclear to me but I think
+	I am not supposed to redistribute either their libraries, or even a binary PEEL plugin like I can do with Bullet.
+	It should be ok to release the source code for the Havok PEEL plugin though, since PAL did the same a long time
+	before me. People interested in the results should be able to download the Havok libraries and recompile the
+	plugins themselves.
+
+	- ICE Physics is a very old physics engine that I wrote before joining NovodeX (so, maybe around 2002). It does
+	not even support joints or convex objects. However I think it still kicks ass for basic rigid body simulation
+	of simple objects. In fact, it may still have the best box stacks in the business. Super stable, super fast.
+	PEEL it and see for yourself. Only the binary PEEL plugin is provided.
+
+	- the PEEL plugin for Newton 3.9 was written by Julio Jerez. It is currently quite incomplete (sleeping is never
+	deactivated, object deletion is not implemented, CCD is not implemented, overlaps and sweeps are not implemented,
+	etc) but I am including it nonetheless, since Newton is quite competitive and worth keeping an eye on.
+
+	- I adapted Julio's plugin for Newton 3.13. This was a straight port, a couple of functions changed but otherwise
+	it is the same as 3.9. Unfortunately I don't know how to use both Newton plugins at the same time in PEEL, since
+	they both use the same DLLs (e.g. 'newton.dll'). I would have to use delay-loading to replicate the same trick as
+	for PhysX, but I didn't have time to try it yet. Meanwhile, recompile the desired Newton plugin each time you want
+	to use it. That should copy the proper Newton DLLs to PEEL's build folder.
+
+	- the PEEL plugin for NovodeX 2.1.1 is provided as source code just in case anybody is interested, but it is
+	terribly obsolete at this point. I haven't compiled it myself in ages.
+
+	- the Opcode 1.3 plugin is an interesting case. First, it shows that PEEL can also deal with collision libraries
+	(as opposed to full blown physics engines). And second, it shows that the venerable, 10+ years old, non-SIMD
+	library, is *still* quite competitive today. In some cases it remains faster than a number of other, more recent
+	implementations.
+
+	- the Opcode 2.0 plugins (only provided as binary for now) show what a revisited, modern version of Opcode can do.
+	So far it pretty much beats everything else. Very proud of that one. There are a number of compile options for
+	Opcode 2.0, and 2 different plugins are provided, using 2 different mesh formats. One of them is better for
+	raycasts, the other one better for overlap queries & memory usage. PEEL is a great way to analyze and track the
+	performance differences between the formats.
+
+	- the various PhysX plugins were the reason I wrote PEEL in the first place: tracking the evolution of PhysX and
+	making sure each new version was better than the last. See for yourself. The PhysX binary DLLs are included, courtesy
+	of NVIDIA. Providing the binaries should be convenient for users: the delay loading mechanism requires that the
+	DLL names are modified for each PhysX version, so that they can all be in the same folder and used in the same app.
+	This is not obvious and slightly uncommon, so it is good if users do not have to do that themselves. In any case
+	you should be able to create a new PhysX PEEL plugin for another version, if the included ones are not enough.
+	
+	- a plugin for PhysX 3.4 is included, even though this version has not been shipped yet. PhysX 3.4 will include an
+	Opcode2-based mesh format, so you can see a preview of things to come here. Expect performance gains in raycasts,
+	overlaps, and sweeps! On the other hand, at time of writing there is a known performance regression in convex
+	sweeps, and a bug in the PCM contact generation. Both have been spotted thanks to PEEL!
+	
+	- PINT_Skeleton is an empty plugin project. Use this to create a PEEL plugin for your own physics engine.
+	Improve your engine today! Take the PEEL test! (100% of people who did that so far discovered things they did not
+	know about their engine, and improved its performance as a result).
+
+	- please report bugs or improvements to existing plugins (in particular Bullet, Newton, Havok). I will hopefully
+	integrate them in the next version of PEEL.
+
+
+* 2012-2015: various PhysX internal versions
+
+

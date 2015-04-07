@@ -1,0 +1,1 @@
+The unziping code has been provided by Alberto García-Vaquero Vega, and is based on the code of PCDEZIP. Copyright 1994, Bob Flanders and Michael Holmes, first Published in PC Magazine January 11, 1994.
