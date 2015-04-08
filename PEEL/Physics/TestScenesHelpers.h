@@ -18,6 +18,7 @@
 //	static const float gSQMaxDist = 10.0f;
 
 	class TestBase;
+	class SurfaceManager;
 
 	const char*			GetFile								(const char* filename, udword& size);
 
@@ -29,7 +30,7 @@
 	PintObjectHandle	CreateStaticObject					(Pint& pint, const PINT_SHAPE_CREATE* shape, const Point& pos, const Quat* rot=null);
 	PintObjectHandle	CreateDynamicBox					(Pint& pint, float size_x, float size_y, float size_z, const Point& pos, const Quat* rot=null, const PINT_MATERIAL_CREATE* material=null);
 
-	PintObjectHandle	CreateSingleTriangleMesh			(Pint& pint, const PintCaps& caps, float scale, Triangle* tri=null, bool reverse_winding=false);
+	void				CreateSingleTriangleMesh			(SurfaceManager& test, float scale, Triangle* tri=null, bool reverse_winding=false);
 	bool				Dominos_Setup						(Pint& pint, const PintCaps& caps, float friction);
 	bool				CreateBoxStack						(Pint& pint, const PintCaps& caps, const udword nb_stacks, udword nb_base_boxes);
 	void				CreateBoxContainer					(Pint& pint, float box_height, float box_side, float box_depth);
@@ -52,7 +53,7 @@
 	bool				Setup_PotPourri_Raycasts			(Pint& pint, const PintCaps& caps, float mass, udword nb_layers, udword nb_x, udword nb_y);
 	bool				Setup_PotPourri_Raycasts			(TestBase& test, udword nb_rays, float max_dist);
 
-	bool				CreateMeshesFromRegisteredSurfaces	(Pint& pint, const TestBase& test);
+	bool				CreateMeshesFromRegisteredSurfaces	(Pint& pint, const PintCaps& caps, const TestBase& test);
 
 	void				CreatePlanarMesh					(TestBase& test, Pint& pint, float altitude);
 

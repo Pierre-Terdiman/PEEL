@@ -14,9 +14,6 @@ Known issues:
 		- ragdoll's joints are not properly setup. It works in other engines, no idea what I'm doing wrong.
 		- "convex stack 2" explodes, even with a small margin. No other engine does that so I'm sure the input data is ok. Not sure how to fix it.
 		- empty static scene perf is still a problem despite Erwin's feedback.
-		- "VeryLargeTriangle" scene crashes.
-		- SceneBoxSweepVsSingleTriangle acts very strangely
-		- SceneConvexSweepVsSingleTriangle crashes
 
 	Havok:
 		- triangles are not backface culled in raytracing tests, producing slightly unfair comparisons.

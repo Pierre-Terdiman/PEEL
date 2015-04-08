@@ -366,10 +366,10 @@ START_SQ_TEST(OverlapAny_SphereVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_S
 
 	virtual bool OverlapAny_SphereVsTessBunny::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportSphereOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportSphereOverlaps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword OverlapAny_SphereVsTessBunny::Update(Pint& pint)
@@ -396,10 +396,10 @@ START_SQ_TEST(OverlapObjects_SphereVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapO
 
 	virtual bool OverlapObjects_SphereVsTessBunny::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportSphereOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportSphereOverlaps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword OverlapObjects_SphereVsTessBunny::Update(Pint& pint)
@@ -426,10 +426,10 @@ START_SQ_TEST(OverlapAny_SpheresVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_
 
 	virtual bool OverlapAny_SpheresVsTessBunny::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportSphereOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportSphereOverlaps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual void OverlapAny_SpheresVsTessBunny::CommonUpdate()
@@ -470,10 +470,10 @@ START_SQ_TEST(OverlapAny_BoxesVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_Bo
 
 	virtual bool OverlapAny_BoxesVsTessBunny::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportBoxOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportBoxOverlaps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword OverlapAny_BoxesVsTessBunny::Update(Pint& pint)
@@ -500,10 +500,10 @@ START_SQ_TEST(OverlapAny_CapsulesVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny
 
 	virtual bool OverlapAny_CapsulesVsTessBunny::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportCapsuleOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportCapsuleOverlaps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword OverlapAny_CapsulesVsTessBunny::Update(Pint& pint)
@@ -550,10 +550,10 @@ START_SQ_TEST(OverlapAny_SpheresVsTerrain, CATEGORY_OVERLAP, gDesc_OverlapAny_Sp
 
 	virtual bool OverlapAny_SpheresVsTerrain::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportSphereOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportSphereOverlaps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword OverlapAny_SpheresVsTerrain::Update(Pint& pint)
@@ -602,10 +602,10 @@ START_SQ_TEST(OverlapAny_BoxesVsTerrain, CATEGORY_OVERLAP, gDesc_OverlapAny_Boxe
 
 	virtual bool OverlapAny_BoxesVsTerrain::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportBoxOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportBoxOverlaps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword OverlapAny_BoxesVsTerrain::Update(Pint& pint)
@@ -797,10 +797,10 @@ START_SQ_TEST(OverlapObjects_SpheresVsKP, CATEGORY_OVERLAP, gDesc_OverlapObjects
 
 	virtual bool OverlapObjects_SpheresVsKP::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportSphereOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportSphereOverlaps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword OverlapObjects_SpheresVsKP::Update(Pint& pint)
@@ -854,10 +854,10 @@ START_SQ_TEST(OverlapObjects_GiantSphereVsKP, CATEGORY_OVERLAP, gDesc_OverlapObj
 
 	virtual bool OverlapObjects_GiantSphereVsKP::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportSphereOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportSphereOverlaps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword OverlapObjects_GiantSphereVsKP::Update(Pint& pint)
@@ -913,10 +913,10 @@ START_SQ_TEST(OverlapObjects_GiantBoxVsKP, CATEGORY_OVERLAP, gDesc_OverlapObject
 
 	virtual bool OverlapObjects_GiantBoxVsKP::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportBoxOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportBoxOverlaps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword OverlapObjects_GiantBoxVsKP::Update(Pint& pint)
@@ -944,11 +944,10 @@ START_SQ_TEST(SphereOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_SphereOve
 
 	virtual bool SphereOverlapTriangles_TestZone::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportSphereOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportSphereOverlaps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword SphereOverlapTriangles_TestZone::Update(Pint& pint)
@@ -984,11 +983,10 @@ START_SQ_TEST(BoxOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_BoxOverlapTr
 
 	virtual bool BoxOverlapTriangles_TestZone::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportBoxOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportBoxOverlaps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword BoxOverlapTriangles_TestZone::Update(Pint& pint)
@@ -1022,11 +1020,10 @@ START_SQ_TEST(CapsuleOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_CapsuleO
 
 	virtual bool CapsuleOverlapTriangles_TestZone::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportCapsuleOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportCapsuleOverlaps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword CapsuleOverlapTriangles_TestZone::Update(Pint& pint)
@@ -1075,11 +1072,10 @@ START_SQ_TEST(SphereOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_SphereOverlapAn
 
 	virtual bool SphereOverlapAny_TestZone::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportSphereOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportSphereOverlaps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword SphereOverlapAny_TestZone::Update(Pint& pint)
@@ -1139,11 +1135,10 @@ START_SQ_TEST(BoxOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_BoxOverlapAny_Test
 
 	virtual bool BoxOverlapAny_TestZone::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportBoxOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportBoxOverlaps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword BoxOverlapAny_TestZone::Update(Pint& pint)
@@ -1197,11 +1192,10 @@ START_SQ_TEST(CapsuleOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_CapsuleOverlap
 
 	virtual bool CapsuleOverlapAny_TestZone::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportCapsuleOverlaps || !caps.mSupportMeshes)
+		if(!caps.mSupportCapsuleOverlaps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword CapsuleOverlapAny_TestZone::Update(Pint& pint)

@@ -173,10 +173,11 @@ START_TEST(CCDTest_DynamicsVsStatics_04, CATEGORY_CCD, gDesc_CCDTest_DynamicsVsS
 
 	virtual bool CCDTest_DynamicsVsStatics_04::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportConvexes || !caps.mSupportRigidBodySimulation)
+		if(!caps.mSupportConvexes || !caps.mSupportRigidBodySimulation)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -226,10 +227,11 @@ START_TEST(CCDTest_DynamicsVsStatics_05, CATEGORY_CCD, gDesc_CCDTest_DynamicsVsS
 
 	virtual bool CCDTest_DynamicsVsStatics_05::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportRigidBodySimulation)
+		if(!caps.mSupportRigidBodySimulation)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		const Point Extents(1.0f, 1.0f, 1.0f);
 		PINT_BOX_CREATE BoxDesc;

@@ -17,6 +17,26 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
+#define START_SQ_RAYCAST_TEST_VS_MESH(name, category, desc)												\
+	class name : public TestBase																		\
+	{																									\
+		public:																							\
+								name()						{						}					\
+		virtual					~name()						{						}					\
+		virtual	const char*		GetName()			const	{ return #name;			}					\
+		virtual	const char*		GetDescription()	const	{ return desc;			}					\
+		virtual	TestCategory	GetCategory()		const	{ return category;		}					\
+		virtual	bool			ProfileUpdate()				{ return true;			}					\
+		virtual	udword			Update(Pint& pint)			{ return DoBatchRaycasts(*this, pint);	}	\
+		virtual	bool			Setup(Pint& pint, const PintCaps& caps)									\
+		{																								\
+			if(!caps.mSupportRaycasts)																	\
+				return false;																			\
+			return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);								\
+		}
+
+///////////////////////////////////////////////////////////////////////////////
+
 	class SceneRaycastVsShapes : public TestBase
 	{
 		public:
@@ -240,7 +260,7 @@ static void LoadMeshSurfaceRays(TestBase& test, const char* filename, Vertices& 
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_MeshSurface = "Mesh surface Visual Test.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_MeshSurface, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_MeshSurface)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_MeshSurface, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_MeshSurface)
 
 	Vertices	mSurfaceRayOrigins;
 	float		mAlpha;
@@ -291,15 +311,6 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_MeshSurface, CATEGORY_RAYCAST, 
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_MeshSurface::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
-	}
-
 	virtual void SceneRaycastVsStaticMeshes_MeshSurface::CommonUpdate()
 	{
 		TestBase::CommonUpdate();
@@ -328,7 +339,7 @@ END_TEST(SceneRaycastVsStaticMeshes_MeshSurface)
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_TestZone_ShortRays = "TestZone. Short rays.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TestZone_ShortRays, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TestZone_ShortRays)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TestZone_ShortRays, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TestZone_ShortRays)
 
 	virtual bool SceneRaycastVsStaticMeshes_TestZone_ShortRays::CommonSetup()
 	{
@@ -356,22 +367,13 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TestZone_ShortRays, CATEGORY_RA
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_TestZone_ShortRays::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_TestZone_ShortRays)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_TestZone_LongRays = "TestZone. Long rays.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TestZone_LongRays, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TestZone_LongRays)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TestZone_LongRays, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TestZone_LongRays)
 
 	virtual bool SceneRaycastVsStaticMeshes_TestZone_LongRays::CommonSetup()
 	{
@@ -401,22 +403,13 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TestZone_LongRays, CATEGORY_RAY
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_TestZone_LongRays::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_TestZone_LongRays)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_TestZone_VerticalRays = "TestZone. Vertical rays.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TestZone_VerticalRays, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TestZone_VerticalRays)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TestZone_VerticalRays, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TestZone_VerticalRays)
 
 	virtual bool SceneRaycastVsStaticMeshes_TestZone_VerticalRays::CommonSetup()
 	{
@@ -444,15 +437,6 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TestZone_VerticalRays, CATEGORY
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_TestZone_VerticalRays::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_TestZone_VerticalRays)
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -473,10 +457,11 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_Archipelago1024, CATEGORY_RAYCA
 
 	virtual bool SceneRaycastVsStaticMeshes_Archipelago1024::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
+		if(!caps.mSupportRaycasts)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -513,10 +498,11 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_Archipelago16384, CATEGORY_RAYC
 
 	virtual bool SceneRaycastVsStaticMeshes_Archipelago16384::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
+		if(!caps.mSupportRaycasts)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -537,7 +523,7 @@ END_TEST(SceneRaycastVsStaticMeshes_Archipelago16384)
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_KP1024 = "1024 raycasts against the Konoko Payne mesh level.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP1024, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP1024)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP1024, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP1024)
 
 	virtual bool SceneRaycastVsStaticMeshes_KP1024::CommonSetup()
 	{
@@ -560,21 +546,13 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP1024, CATEGORY_RAYCAST, gDesc
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_KP1024::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_KP1024)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_KP16384 = "16384 raycasts against the Konoko Payne mesh level.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP16384, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP16384)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP16384, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP16384)
 
 	virtual bool SceneRaycastVsStaticMeshes_KP16384::CommonSetup()
 	{
@@ -597,21 +575,13 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP16384, CATEGORY_RAYCAST, gDes
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_KP16384::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_KP16384)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_KP16384_2 = "16384 raycasts against the Konoko Payne mesh level (2).";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP16384_2, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP16384_2)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP16384_2, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP16384_2)
 
 	virtual bool SceneRaycastVsStaticMeshes_KP16384_2::CommonSetup()
 	{
@@ -634,21 +604,13 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP16384_2, CATEGORY_RAYCAST, gD
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_KP16384_2::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_KP16384_2)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_KP16384_NoHit = "16384 very short 'sensor' raycasts against the Konoko Payne mesh level. No hits.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP16384_NoHit, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP16384_NoHit)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP16384_NoHit, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP16384_NoHit)
 
 	virtual bool SceneRaycastVsStaticMeshes_KP16384_NoHit::CommonSetup()
 	{
@@ -673,21 +635,13 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP16384_NoHit, CATEGORY_RAYCAST
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_KP16384_NoHit::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_KP16384_NoHit)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_KP_Single = "Single long raycasts against the Konoko Payne mesh level.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP_Single, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP_Single)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP_Single, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP_Single)
 
 	virtual bool SceneRaycastVsStaticMeshes_KP_Single::CommonSetup()
 	{
@@ -713,21 +667,13 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP_Single, CATEGORY_RAYCAST, gD
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_KP_Single::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_KP_Single)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_KP2_Long = "2048 long raycasts against the Konoko Payne mesh level.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP2_Long, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP2_Long)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP2_Long, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP2_Long)
 
 	virtual bool SceneRaycastVsStaticMeshes_KP2_Long::CommonSetup()
 	{
@@ -753,21 +699,13 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP2_Long, CATEGORY_RAYCAST, gDe
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_KP2_Long::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_KP2_Long)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_KP2_Short = "2048 short raycasts against the Konoko Payne mesh level.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP2_Short, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP2_Short)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP2_Short, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP2_Short)
 
 	virtual bool SceneRaycastVsStaticMeshes_KP2_Short::CommonSetup()
 	{
@@ -812,14 +750,6 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_KP2_Short, CATEGORY_RAYCAST, gD
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_KP2_Short::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_KP2_Short)
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -840,10 +770,11 @@ START_SQ_TEST(SceneRaycastVsStaticMeshes_KP_Phantom, CATEGORY_RAYCAST, gDesc_Sce
 
 	virtual bool SceneRaycastVsStaticMeshes_KP_Phantom::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
+		if(!caps.mSupportRaycasts)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		if(0)
 		{
@@ -985,7 +916,7 @@ udword SceneRaycastVsStaticMeshes_KP2_Phantom::Update(Pint& pint)
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_Terrain_Long = "128*128 long raycasts against the tesselated terrain.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_Terrain_Long, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_Terrain_Long)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_Terrain_Long, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_Terrain_Long)
 
 	virtual bool SceneRaycastVsStaticMeshes_Terrain_Long::CommonSetup()
 	{
@@ -1012,21 +943,13 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_Terrain_Long, CATEGORY_RAYCAST,
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_Terrain_Long::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_Terrain_Long)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_Terrain_Short = "32*32 short raycasts against the tesselated terrain.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_Terrain_Short, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_Terrain_Short)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_Terrain_Short, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_Terrain_Short)
 
 	virtual bool SceneRaycastVsStaticMeshes_Terrain_Short::CommonSetup()
 	{
@@ -1067,14 +990,6 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_Terrain_Short, CATEGORY_RAYCAST
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_Terrain_Short::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_Terrain_Short)
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1082,7 +997,7 @@ END_TEST(SceneRaycastVsStaticMeshes_Terrain_Short)
 static const char* gDesc_SceneRaycastVsStaticMeshes_TessBunny_NodeSorting = "Node sorting test. 2048 raycasts are fired from one of the 8 canonical directions in sequence. In theory the \
 cost for each of the 8 directions should be roughly the same. In practice, engines without node sorting show a very high variation here. The direction changes every 32 frames.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TessBunny_NodeSorting, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunny_NodeSorting)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TessBunny_NodeSorting, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunny_NodeSorting)
 
 	udword	mNbFrames;
 	udword	mIndex;
@@ -1103,14 +1018,6 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TessBunny_NodeSorting, CATEGORY
 		for(udword i=0;i<2048;i++)
 			RegisterRaycast(Point(0.0f, 0.0f, 0.0f), Point(0.0f, 0.0f, 0.0f), 2000.0f);
 		return true;
-	}
-
-	virtual bool SceneRaycastVsStaticMeshes_TessBunny_NodeSorting::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
 	}
 
 	virtual void SceneRaycastVsStaticMeshes_TessBunny_NodeSorting::CommonUpdate()
@@ -1168,7 +1075,7 @@ END_TEST(SceneRaycastVsStaticMeshes_TessBunny_NodeSorting)
 
 static const char* gDesc_SceneRaycastVsStaticMeshes_TessBunny16384 = "16384 radial raycasts against the tesselated bunny.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TessBunny16384, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunny16384)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TessBunny16384, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunny16384)
 
 	virtual bool SceneRaycastVsStaticMeshes_TessBunny16384::CommonSetup()
 	{
@@ -1196,14 +1103,6 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TessBunny16384, CATEGORY_RAYCAS
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_TessBunny16384::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_TessBunny16384)
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1211,7 +1110,7 @@ END_TEST(SceneRaycastVsStaticMeshes_TessBunny16384)
 static const char* gDesc_SceneRaycastVsStaticMeshes_TessBunny16384_2 = "16384 radial raycasts against the tesselated bunny. Same as before but with a larger ray length. In theory the \
 ray length should not have an impact on performance. In practice however, some engines become much slower when the ray becomes larger.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TessBunny16384_2, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunny16384_2)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TessBunny16384_2, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunny16384_2)
 
 	virtual bool SceneRaycastVsStaticMeshes_TessBunny16384_2::CommonSetup()
 	{
@@ -1239,14 +1138,6 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TessBunny16384_2, CATEGORY_RAYC
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_TessBunny16384_2::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_TessBunny16384_2)
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1254,7 +1145,7 @@ END_TEST(SceneRaycastVsStaticMeshes_TessBunny16384_2)
 static const char* gDesc_SceneRaycastVsStaticMeshes_TessBunnyShort = "Short raycasts against the tesselated bunny. There is one raycast per triangle. \
 Each ray starts a little bit above the triangle. Ray direction is the opposite of the triangle normal.";
 
-START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TessBunnyShort, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunnyShort)
+START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TessBunnyShort, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunnyShort)
 
 	virtual bool SceneRaycastVsStaticMeshes_TessBunnyShort::CommonSetup()
 	{
@@ -1281,21 +1172,13 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_TessBunnyShort, CATEGORY_RAYCAS
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_TessBunnyShort::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(SceneRaycastVsStaticMeshes_TessBunnyShort)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_KP_RT = "Konoko Payne mesh level. Raytracing test.";
 
-START_SQ_RAYCAST_TEST(KP_RT, CATEGORY_RAYCAST, gDesc_KP_RT)
+START_SQ_RAYCAST_TEST_VS_MESH(KP_RT, CATEGORY_RAYCAST, gDesc_KP_RT)
 
 	virtual bool KP_RT::CommonSetup()
 	{
@@ -1307,21 +1190,13 @@ START_SQ_RAYCAST_TEST(KP_RT, CATEGORY_RAYCAST, gDesc_KP_RT)
 		return true;
 	}
 
-	virtual bool KP_RT::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(KP_RT)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_Bunny_RT = "Bunny. Raytracing test.";
 
-START_SQ_RAYCAST_TEST(Bunny_RT, CATEGORY_RAYCAST, gDesc_Bunny_RT)
+START_SQ_RAYCAST_TEST_VS_MESH(Bunny_RT, CATEGORY_RAYCAST, gDesc_Bunny_RT)
 
 	virtual bool Bunny_RT::CommonSetup()
 	{
@@ -1333,21 +1208,13 @@ START_SQ_RAYCAST_TEST(Bunny_RT, CATEGORY_RAYCAST, gDesc_Bunny_RT)
 		return true;
 	}
 
-	virtual bool Bunny_RT::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(Bunny_RT)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_Terrain_RT = "Terrain tiles. Raytracing test.";
 
-START_SQ_RAYCAST_TEST(Terrain_RT, CATEGORY_RAYCAST, gDesc_Terrain_RT)
+START_SQ_RAYCAST_TEST_VS_MESH(Terrain_RT, CATEGORY_RAYCAST, gDesc_Terrain_RT)
 
 	virtual bool Terrain_RT::CommonSetup()
 	{
@@ -1358,21 +1225,13 @@ START_SQ_RAYCAST_TEST(Terrain_RT, CATEGORY_RAYCAST, gDesc_Terrain_RT)
 		return true;
 	}
 
-	virtual bool Terrain_RT::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(Terrain_RT)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_TestZone_RT = "TestZone (tess). Raytracing test.";
 
-START_SQ_RAYCAST_TEST(TestZone_RT, CATEGORY_RAYCAST, gDesc_TestZone_RT)
+START_SQ_RAYCAST_TEST_VS_MESH(TestZone_RT, CATEGORY_RAYCAST, gDesc_TestZone_RT)
 
 	virtual bool TestZone_RT::CommonSetup()
 	{
@@ -1384,21 +1243,13 @@ START_SQ_RAYCAST_TEST(TestZone_RT, CATEGORY_RAYCAST, gDesc_TestZone_RT)
 		return true;
 	}
 
-	virtual bool TestZone_RT::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(TestZone_RT)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_TestZone_RT2 = "TestZone (tess). Raytracing test 2.";
 
-START_SQ_RAYCAST_TEST(TestZone_RT2, CATEGORY_RAYCAST, gDesc_TestZone_RT2)
+START_SQ_RAYCAST_TEST_VS_MESH(TestZone_RT2, CATEGORY_RAYCAST, gDesc_TestZone_RT2)
 
 	virtual bool TestZone_RT2::CommonSetup()
 	{
@@ -1410,21 +1261,13 @@ START_SQ_RAYCAST_TEST(TestZone_RT2, CATEGORY_RAYCAST, gDesc_TestZone_RT2)
 		return true;
 	}
 
-	virtual bool TestZone_RT2::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 END_TEST(TestZone_RT2)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_TestZone_RT3 = "TestZone. Raytracing ride test.";
 
-START_SQ_RAYCAST_TEST(TestZone_RT3, CATEGORY_RAYCAST, gDesc_TestZone_RT3)
+START_SQ_RAYCAST_TEST_VS_MESH(TestZone_RT3, CATEGORY_RAYCAST, gDesc_TestZone_RT3)
 
 	virtual bool TestZone_RT3::CommonSetup()
 	{
@@ -1443,14 +1286,6 @@ START_SQ_RAYCAST_TEST(TestZone_RT3, CATEGORY_RAYCAST, gDesc_TestZone_RT3)
 		return true;
 	}
 
-	virtual bool TestZone_RT3::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 	virtual void TestZone_RT3::CommonUpdate()
 	{
 		mCameraManager.UpdateCameraPose();
@@ -1463,7 +1298,7 @@ END_TEST(TestZone_RT3)
 
 static const char* gDesc_Terrain_RT2 = "Terrain. Raytracing ride test.";
 
-START_SQ_RAYCAST_TEST(Terrain_RT2, CATEGORY_RAYCAST, gDesc_Terrain_RT2)
+START_SQ_RAYCAST_TEST_VS_MESH(Terrain_RT2, CATEGORY_RAYCAST, gDesc_Terrain_RT2)
 
 	virtual bool Terrain_RT2::CommonSetup()
 	{
@@ -1480,14 +1315,6 @@ START_SQ_RAYCAST_TEST(Terrain_RT2, CATEGORY_RAYCAST, gDesc_Terrain_RT2)
 		return true;
 	}
 
-	virtual bool Terrain_RT2::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 	virtual void Terrain_RT2::CommonUpdate()
 	{
 		mCameraManager.UpdateCameraPose();
@@ -1500,7 +1327,7 @@ END_TEST(Terrain_RT2)
 
 static const char* gDesc_KP_RT2 = "KP. Raytracing ride test.";
 
-START_SQ_RAYCAST_TEST(KP_RT2, CATEGORY_RAYCAST, gDesc_KP_RT2)
+START_SQ_RAYCAST_TEST_VS_MESH(KP_RT2, CATEGORY_RAYCAST, gDesc_KP_RT2)
 
 	virtual bool KP_RT2::CommonSetup()
 	{
@@ -1517,14 +1344,6 @@ START_SQ_RAYCAST_TEST(KP_RT2, CATEGORY_RAYCAST, gDesc_KP_RT2)
 		return true;
 	}
 
-	virtual bool KP_RT2::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportMeshes)
-			return false;
-
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
-	}
-
 	virtual void KP_RT2::CommonUpdate()
 	{
 		mCameraManager.UpdateCameraPose();
@@ -1537,7 +1356,7 @@ END_TEST(KP_RT2)
 
 static const char* gDesc_InsideRays_TestZone = "TestZone. Inside rays.";
 
-START_SQ_RAYCAST_TEST(InsideRays_TestZone, CATEGORY_RAYCAST, gDesc_InsideRays_TestZone)
+START_SQ_RAYCAST_TEST_VS_MESH(InsideRays_TestZone, CATEGORY_RAYCAST, gDesc_InsideRays_TestZone)
 
 	virtual bool InsideRays_TestZone::CommonSetup()
 	{
@@ -1571,22 +1390,13 @@ START_SQ_RAYCAST_TEST(InsideRays_TestZone, CATEGORY_RAYCAST, gDesc_InsideRays_Te
 		return true;
 	}
 
-	virtual bool InsideRays_TestZone::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportRaycasts || !caps.mSupportMeshes)
-			return false;
-
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
-	}
-
 END_TEST(InsideRays_TestZone)
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static const char* gDesc_OutsideRays_TestZone = "TestZone. Outside rays.";
 
-START_SQ_RAYCAST_TEST(OutsideRays_TestZone, CATEGORY_RAYCAST, gDesc_OutsideRays_TestZone)
+START_SQ_RAYCAST_TEST_VS_MESH(OutsideRays_TestZone, CATEGORY_RAYCAST, gDesc_OutsideRays_TestZone)
 
 	virtual bool OutsideRays_TestZone::CommonSetup()
 	{
@@ -1613,15 +1423,6 @@ START_SQ_RAYCAST_TEST(OutsideRays_TestZone, CATEGORY_RAYCAST, gDesc_OutsideRays_
 //				RegisterRaycast(Point(8.36f, -4.22f, -28.18f), D, 2.0f);
 			}
 		}
-		return true;
-	}
-
-	virtual bool OutsideRays_TestZone::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportRaycasts || !caps.mSupportMeshes)
-			return false;
-
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
 		return true;
 	}
 
@@ -1701,7 +1502,7 @@ START_SQ_RAYCAST_TEST(name, CATEGORY_RAYCAST, desc)							\
 END_TEST(name)
 
 #define IMPLEMENT_VALVE_RAYCAST_TEST_OLD(name, desc, filename)				\
-START_SQ_RAYCAST_TEST(name, CATEGORY_RAYCAST, desc)							\
+START_SQ_RAYCAST_TEST_VS_MESH(name, CATEGORY_RAYCAST, desc)					\
 																			\
 	virtual bool name::IsPrivate()	const									\
 	{																		\
@@ -1715,13 +1516,6 @@ START_SQ_RAYCAST_TEST(name, CATEGORY_RAYCAST, desc)							\
 		LoadRepXFile_Obsolete(*this, "c5m4_quarter2_Statics.repx", gValveScale, true);\
 		mCreateDefaultEnvironment = false;									\
 		return true;														\
-	}																		\
-																			\
-	virtual bool name::Setup(Pint& pint, const PintCaps& caps)				\
-	{																		\
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)					\
-			return false;													\
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);				\
 	}																		\
 																			\
 END_TEST(name)
@@ -1819,7 +1613,7 @@ END_TEST(PlanetsideBulletRays)
 
 static const char* gDesc_BlackRays = "Black rays (debug).";
 
-START_SQ_RAYCAST_TEST(BlackRays, CATEGORY_RAYCAST, gDesc_BlackRays)
+START_SQ_RAYCAST_TEST_VS_MESH(BlackRays, CATEGORY_RAYCAST, gDesc_BlackRays)
 
 	virtual bool BlackRays::CommonSetup()
 	{
@@ -1828,13 +1622,6 @@ START_SQ_RAYCAST_TEST(BlackRays, CATEGORY_RAYCAST, gDesc_BlackRays)
 		LoadMeshesFromFile_(*this, "Venus.bin", null, false, 0);
 		mCreateDefaultEnvironment = false;
 		return true;
-	}
-
-	virtual bool BlackRays::Setup(Pint& pint, const PintCaps& caps)
-	{
-		if(!caps.mSupportRaycasts || !caps.mSupportMeshes)
-			return false;
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
 	}
 
 END_TEST(BlackRays)

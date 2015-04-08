@@ -36,14 +36,18 @@ const char* GetFile(const char* filename, udword& size)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-PintObjectHandle CreateSingleTriangleMesh(Pint& pint, const PintCaps& caps, float scale, Triangle* tri, bool reverse_winding)
+void CreateSingleTriangleMesh(SurfaceManager& test, float scale, Triangle* tri, bool reverse_winding)
 {
-	if(!caps.mSupportMeshes)
-		return null;
+	ASSERT(!test.GetNbSurfaces());
 
-//	DWORD time = TimeGetTime();
+	const udword NbFaces = 1;
+	const udword NbVerts = 3;
 
-	Point Verts[3];
+	IndexedSurface* IS = test.CreateManagedSurface();
+	bool Status = IS->Init(NbFaces, NbVerts);
+	ASSERT(Status);
+
+	Point* Verts = IS->GetVerts();
 	Verts[0] = Point(0.0f, 0.0f, 0.0f);
 	Verts[1] = Point(scale, 0.0f, 0.0f);
 	Verts[2] = Point(scale, 0.0f, scale);
@@ -60,24 +64,8 @@ PintObjectHandle CreateSingleTriangleMesh(Pint& pint, const PintCaps& caps, floa
 	}
 
 	const IndexedTriangle Indices(0, reverse_winding ? 1 : 2, reverse_winding ? 2 : 1);
-
-	IndexedSurface IS;
-	IS.Init(1, 3, Verts, &Indices);
-
-	PINT_MESH_CREATE MeshDesc;
-	MeshDesc.mSurface	= IS.GetSurfaceInterface();
-	MeshDesc.mRenderer	= CreateMeshRenderer(MeshDesc.mSurface);
-
-	PINT_OBJECT_CREATE ObjectDesc;
-	ObjectDesc.mShapes		= &MeshDesc;
-	ObjectDesc.mPosition	= Point(0.0f, 0.0f, 0.0f);
-	ObjectDesc.mMass		= 0.0f;
-	PintObjectHandle h = CreatePintObject(pint, ObjectDesc);
-
-//	time = TimeGetTime() - time;
-//	printf("Mesh creation time: %d (%s)\n", time, pint.GetName());
-
-	return h;
+	IndexedTriangle* F = IS->GetFaces();
+	*F = Indices;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -812,8 +800,11 @@ static void TessellateTriangle(udword& nb_new_tris, const Triangle& tr, Triangle
 	};
 }
 
-bool CreateMeshesFromRegisteredSurfaces(Pint& pint, const TestBase& test)
+bool CreateMeshesFromRegisteredSurfaces(Pint& pint, const PintCaps& caps, const TestBase& test)
 {
+	if(!caps.mSupportMeshes)
+		return false;
+
 	DWORD time = TimeGetTime();
 
 	// Take a deep breath... and down the hatch

@@ -2061,9 +2061,7 @@ START_TEST(Ragdolls_256_OnTerrain, CATEGORY_PERFORMANCE, gDesc_Ragdoll256_OnTerr
 	{
 //		if(!caps.mSupportRaycasts)
 //			return false;
-		if(!caps.mSupportMeshes)
-			return false;
-		if(!CreateMeshesFromRegisteredSurfaces(pint, *this))
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
 			return false;
 
 		Point Center, Extents;
@@ -2161,10 +2159,11 @@ START_TEST(DynamicSpheresOnArchipelago, CATEGORY_PERFORMANCE, gDesc_DynamicSpher
 
 	virtual bool DynamicSpheresOnArchipelago::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportRigidBodySimulation)
+		if(!caps.mSupportRigidBodySimulation)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -2203,10 +2202,11 @@ START_TEST(DynamicCapsulesOnArchipelago, CATEGORY_PERFORMANCE, gDesc_DynamicCaps
 
 	virtual bool DynamicCapsulesOnArchipelago::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportRigidBodySimulation)
+		if(!caps.mSupportRigidBodySimulation)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -2246,10 +2246,11 @@ START_TEST(DynamicConvexesOnArchipelago, CATEGORY_PERFORMANCE, gDesc_DynamicConv
 
 	virtual bool DynamicConvexesOnArchipelago::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportConvexes || !caps.mSupportRigidBodySimulation)
+		if(!caps.mSupportConvexes || !caps.mSupportRigidBodySimulation)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -2299,10 +2300,11 @@ START_TEST(DynamicConvexesOnArchipelago2, CATEGORY_PERFORMANCE, gDesc_DynamicCon
 
 	virtual bool DynamicConvexesOnArchipelago2::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportConvexes || !caps.mSupportRigidBodySimulation)
+		if(!caps.mSupportConvexes || !caps.mSupportRigidBodySimulation)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -2358,10 +2360,11 @@ START_TEST(DynamicConvexesOnArchipelagoTess, CATEGORY_PERFORMANCE, gDesc_Dynamic
 
 	virtual bool DynamicConvexesOnArchipelagoTess::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportConvexes || !caps.mSupportRigidBodySimulation)
+		if(!caps.mSupportConvexes || !caps.mSupportRigidBodySimulation)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -3120,10 +3123,11 @@ START_TEST(HACD_Test_02, CATEGORY_PERFORMANCE, gDesc_HACD_Test_02)
 
 	virtual bool HACD_Test_02::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportRigidBodySimulation || !caps.mSupportConvexes || !caps.mSupportMeshes)
+		if(!caps.mSupportRigidBodySimulation || !caps.mSupportConvexes)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Center, Extents;
 		GetGlobalBounds(Center, Extents);

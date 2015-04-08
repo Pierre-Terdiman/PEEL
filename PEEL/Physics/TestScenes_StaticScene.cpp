@@ -97,13 +97,16 @@ static const char* gDesc_SingleTriangle = "Single triangle. Used to check edge c
 
 START_TEST(SingleTriangle, CATEGORY_STATIC_SCENE, gDesc_SingleTriangle)
 
+	virtual bool SingleTriangle::CommonSetup()
+	{
+		CreateSingleTriangleMesh(*this, 100.0f);
+		mCreateDefaultEnvironment = false;
+		return TestBase::CommonSetup();
+	}
+
 	virtual bool SingleTriangle::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!CreateSingleTriangleMesh(pint, caps, 100.0f))
-			return false;
-
-		mCreateDefaultEnvironment = false;
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 END_TEST(SingleTriangle)
@@ -123,9 +126,7 @@ START_TEST(name, CATEGORY_STATIC_SCENE, desc)							\
 																		\
 	virtual bool name::Setup(Pint& pint, const PintCaps& caps)			\
 	{																	\
-		if(!caps.mSupportMeshes)										\
-			return false;												\
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);			\
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);	\
 	}
 
 static const char* gDesc_KP = "Konoko Payne mesh level. Used to check memory usage and for raytracing tests.";
@@ -224,9 +225,7 @@ static const char* gDesc_VenusMini100 = "Venus scene scaled by 1/100. Used for t
 
 		virtual bool VenusMini100::Setup(Pint& pint, const PintCaps& caps)
 		{
-			if(!caps.mSupportMeshes)
-				return false;
-			return CreateMeshesFromRegisteredSurfaces(pint, *this);
+			return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 		}
 
 		virtual void VenusMini100::GetSceneParams(PINT_WORLD_CREATE& desc)
@@ -251,9 +250,7 @@ static const char* gDesc_VenusMini1000 = "Venus scene scaled by 1/1000. Used for
 
 		virtual bool VenusMini1000::Setup(Pint& pint, const PintCaps& caps)
 		{
-			if(!caps.mSupportMeshes)
-				return false;
-			return CreateMeshesFromRegisteredSurfaces(pint, *this);
+			return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 		}
 
 		virtual void VenusMini1000::GetSceneParams(PINT_WORLD_CREATE& desc)
@@ -278,9 +275,7 @@ static const char* gDesc_VenusMaxi100 = "Venus scene scaled by 100. Used for the
 
 		virtual bool VenusMaxi100::Setup(Pint& pint, const PintCaps& caps)
 		{
-			if(!caps.mSupportMeshes)
-				return false;
-			return CreateMeshesFromRegisteredSurfaces(pint, *this);
+			return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 		}
 
 		virtual void VenusMaxi100::GetSceneParams(PINT_WORLD_CREATE& desc)
@@ -305,9 +300,7 @@ static const char* gDesc_VenusMaxi1000 = "Venus scene scaled by 1000. Used for t
 
 		virtual bool VenusMaxi1000::Setup(Pint& pint, const PintCaps& caps)
 		{
-			if(!caps.mSupportMeshes)
-				return false;
-			return CreateMeshesFromRegisteredSurfaces(pint, *this);
+			return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 		}
 
 		virtual void VenusMaxi1000::GetSceneParams(PINT_WORLD_CREATE& desc)

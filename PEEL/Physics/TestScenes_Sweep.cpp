@@ -519,9 +519,19 @@ START_SQ_TEST(SweepAccuracy2, CATEGORY_SWEEP, gDesc_SweepAccuracy2)
 		desc.mCamera[0] = CameraPose(Point(10.42f, 0.02f, 5.22f), Point(-0.82f, 0.15f, -0.55f));
 	}
 
+	virtual bool SweepAccuracy2::CommonSetup()
+	{
+		CreateSingleTriangleMesh(*this, 5000.0f);
+		mCreateDefaultEnvironment = false;
+		return TestBase::CommonSetup();
+	}
+
 	virtual bool SweepAccuracy2::Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportMeshes || !caps.mSupportCapsuleSweeps)
+			return false;
+
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
 			return false;
 
 	/*		const float Radius = 0.5f;
@@ -539,9 +549,6 @@ START_SQ_TEST(SweepAccuracy2, CATEGORY_SWEEP, gDesc_SweepAccuracy2)
 			CreatePintObject(pint, ObjectDesc);
 	*/
 
-		if(!CreateSingleTriangleMesh(pint, caps, 5000.0f))
-			return false;
-
 		const Point Dir(0.0f, -1.0f, 0.0f);
 		const float CapsuleRadius = 1.4f;
 		const float HalfHeight = 1.8f;
@@ -550,8 +557,6 @@ START_SQ_TEST(SweepAccuracy2, CATEGORY_SWEEP, gDesc_SweepAccuracy2)
 		const Point P0(HalfHeight, 10.0f, HalfHeight);
 		const Point P1(-HalfHeight, 10.0f, -HalfHeight);
 		RegisterCapsuleSweep(LSS(Segment(P0, P1), CapsuleRadius), Dir, gSQMaxDist);
-
-		mCreateDefaultEnvironment = false;
 		return true;
 	}
 
@@ -763,14 +768,14 @@ END_TEST(SceneLongCapsuleSweepVsSeaOfStatics)
 
 		virtual bool SceneSweepVsSingleTriangle::CommonSetup()
 		{
-			TestBase::CommonSetup();
+			CreateSingleTriangleMesh(*this, 4.0f, &mTriangle, mDoubleSided);
 			mCreateDefaultEnvironment = false;
-			return true;
+			return TestBase::CommonSetup();
 		}
 
 		virtual bool SceneSweepVsSingleTriangle::Setup(Pint& pint, const PintCaps& caps)
 		{
-			if(!caps.mSupportMeshes)
+			if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
 				return false;
 
 			if(mType==PINT_SHAPE_SPHERE && !caps.mSupportSphereSweeps)
@@ -780,9 +785,6 @@ END_TEST(SceneLongCapsuleSweepVsSeaOfStatics)
 			if(mType==PINT_SHAPE_BOX && !caps.mSupportBoxSweeps)
 				return false;
 			if(mType==PINT_SHAPE_CONVEX && !caps.mSupportConvexSweeps)
-				return false;
-
-			if(!CreateSingleTriangleMesh(pint, caps, 4.0f, &mTriangle, mDoubleSided))
 				return false;
 
 			const Point Dir(0.0f, -1.0f, 0.0f);
@@ -992,6 +994,8 @@ static const char* gDesc_SceneSphereSweepVsSingleTriangle_InitialOverlap = "1 sp
 
 START_SQ_TEST(SceneSphereSweepVsSingleTriangle_InitialOverlap, CATEGORY_SWEEP, gDesc_SceneSphereSweepVsSingleTriangle_InitialOverlap)
 
+	Triangle mTriangle;
+
 	virtual void SceneSphereSweepVsSingleTriangle_InitialOverlap::GetSceneParams(PINT_WORLD_CREATE& desc)
 	{
 		TestBase::GetSceneParams(desc);
@@ -1000,19 +1004,20 @@ START_SQ_TEST(SceneSphereSweepVsSingleTriangle_InitialOverlap, CATEGORY_SWEEP, g
 
 	virtual bool SceneSphereSweepVsSingleTriangle_InitialOverlap::CommonSetup()
 	{
-		TestBase::CommonSetup();
+		CreateSingleTriangleMesh(*this, 4.0f, &mTriangle);
 		mCreateDefaultEnvironment = false;
-		return true;
+		return TestBase::CommonSetup();
 	}
 
 	virtual bool SceneSphereSweepVsSingleTriangle_InitialOverlap::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportSphereSweeps)
+		if(!caps.mSupportSphereSweeps)
 			return false;
 
-		Triangle T;
-		if(!CreateSingleTriangleMesh(pint, caps, 4.0f, &T))
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
 			return false;
+
+		const Triangle& T = mTriangle;
 
 		Point TriCenter;
 		T.Center(TriCenter);
@@ -1082,17 +1087,17 @@ START_SQ_TEST(SceneCapsuleSweepVsSingleTriangle_InitialOverlap, CATEGORY_SWEEP, 
 
 	virtual bool SceneCapsuleSweepVsSingleTriangle_InitialOverlap::CommonSetup()
 	{
-		TestBase::CommonSetup();
+		CreateSingleTriangleMesh(*this, 4.0f);
 		mCreateDefaultEnvironment = false;
-		return true;
+		return TestBase::CommonSetup();
 	}
 
 	virtual bool SceneCapsuleSweepVsSingleTriangle_InitialOverlap::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportCapsuleSweeps)
+		if(!caps.mSupportCapsuleSweeps)
 			return false;
 
-		if(!CreateSingleTriangleMesh(pint, caps, 4.0f))
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
 			return false;
 
 		const Point Dir(0.0f, -1.0f, 0.0f);
@@ -1184,17 +1189,17 @@ START_SQ_TEST(SceneBoxSweepVsSingleTriangle_InitialOverlap, CATEGORY_SWEEP, gDes
 
 	virtual bool SceneBoxSweepVsSingleTriangle_InitialOverlap::CommonSetup()
 	{
-		TestBase::CommonSetup();
+		CreateSingleTriangleMesh(*this, 4.0f);
 		mCreateDefaultEnvironment = false;
-		return true;
+		return TestBase::CommonSetup();
 	}
 
 	virtual bool SceneBoxSweepVsSingleTriangle_InitialOverlap::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportBoxSweeps)
+		if(!caps.mSupportBoxSweeps)
 			return false;
 
-		if(!CreateSingleTriangleMesh(pint, caps, 4.0f))
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
 			return false;
 
 		const Point Dir(0.0f, -1.0f, 0.0f);
@@ -1227,6 +1232,8 @@ static const char* gDesc_SceneSphereSweepVsSingleTriangle_ParallelSweep = "1 sph
 
 START_SQ_TEST(SceneSphereSweepVsSingleTriangle_ParallelSweep, CATEGORY_SWEEP, gDesc_SceneSphereSweepVsSingleTriangle_ParallelSweep)
 
+	Triangle mTriangle;
+
 	virtual void SceneSphereSweepVsSingleTriangle_ParallelSweep::GetSceneParams(PINT_WORLD_CREATE& desc)
 	{
 		TestBase::GetSceneParams(desc);
@@ -1235,19 +1242,20 @@ START_SQ_TEST(SceneSphereSweepVsSingleTriangle_ParallelSweep, CATEGORY_SWEEP, gD
 
 	virtual bool SceneSphereSweepVsSingleTriangle_ParallelSweep::CommonSetup()
 	{
-		TestBase::CommonSetup();
+		CreateSingleTriangleMesh(*this, 4.0f, &mTriangle);
 		mCreateDefaultEnvironment = false;
-		return true;
+		return TestBase::CommonSetup();
 	}
 
 	virtual bool SceneSphereSweepVsSingleTriangle_ParallelSweep::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportSphereSweeps)
+		if(!caps.mSupportSphereSweeps)
 			return false;
 
-		Triangle T;
-		if(!CreateSingleTriangleMesh(pint, caps, 4.0f, &T))
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
 			return false;
+
+		const Triangle& T = mTriangle;
 
 		Point TriCenter;
 		T.Center(TriCenter);
@@ -1302,17 +1310,17 @@ START_SQ_TEST(SceneCapsuleSweepVsSingleTriangle_ParallelSweep, CATEGORY_SWEEP, g
 
 	virtual bool SceneCapsuleSweepVsSingleTriangle_ParallelSweep::CommonSetup()
 	{
-		TestBase::CommonSetup();
+		CreateSingleTriangleMesh(*this, 4.0f);
 		mCreateDefaultEnvironment = false;
-		return true;
+		return TestBase::CommonSetup();
 	}
 
 	virtual bool SceneCapsuleSweepVsSingleTriangle_ParallelSweep::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportCapsuleSweeps)
+		if(!caps.mSupportCapsuleSweeps)
 			return false;
 
-		if(!CreateSingleTriangleMesh(pint, caps, 4.0f))
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
 			return false;
 
 		const Point Dir(1.0f, 0.0f, 0.0f);
@@ -1396,17 +1404,17 @@ START_SQ_TEST(SceneBoxSweepVsSingleTriangle_ParallelSweep, CATEGORY_SWEEP, gDesc
 
 	virtual bool SceneBoxSweepVsSingleTriangle_ParallelSweep::CommonSetup()
 	{
-		TestBase::CommonSetup();
+		CreateSingleTriangleMesh(*this, 4.0f);
 		mCreateDefaultEnvironment = false;
-		return true;
+		return TestBase::CommonSetup();
 	}
 
 	virtual bool SceneBoxSweepVsSingleTriangle_ParallelSweep::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportBoxSweeps)
+		if(!caps.mSupportBoxSweeps)
 			return false;
 
-		if(!CreateSingleTriangleMesh(pint, caps, 4.0f))
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
 			return false;
 
 		const Point Dir(1.0f, 0.0f, 0.0f);
@@ -1451,10 +1459,11 @@ START_SQ_TEST(SceneBoxSweepVsStaticMeshes_Archipelago, CATEGORY_SWEEP, gDesc_Sce
 
 	virtual bool SceneBoxSweepVsStaticMeshes_Archipelago::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportBoxSweeps)
+		if(!caps.mSupportBoxSweeps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -1519,10 +1528,10 @@ START_SQ_TEST(SceneBoxSweepVsStaticMeshes_KP, CATEGORY_SWEEP, gDesc_SceneBoxSwee
 
 	virtual bool SceneBoxSweepVsStaticMeshes_KP::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportBoxSweeps)
+		if(!caps.mSupportBoxSweeps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual void SceneBoxSweepVsStaticMeshes_KP::CommonUpdate()
@@ -1568,10 +1577,10 @@ static bool CommonSetup_SceneBoxSweepVsStaticMeshes_TessBunny(TestBase& test, co
 
 static bool Setup_SceneBoxSweepVsStaticMeshes_TessBunny(TestBase& test, Pint& pint, const PintCaps& caps/*, const Point& extents, udword nb_sweeps, const Matrix3x3& rot*/)
 {
-	if(!caps.mSupportMeshes || !caps.mSupportBoxSweeps)
+	if(!caps.mSupportBoxSweeps)
 		return false;
 
-	return CreateMeshesFromRegisteredSurfaces(pint, test);
+	return CreateMeshesFromRegisteredSurfaces(pint, caps, test);
 }
 
 static const char* gDesc_SceneBoxSweepVsStaticMeshes_TessBunny_Test1 = "64 radial box-sweeps against the tesselated bunny. Each box is a (1, 1, 1) cube. Box orientation is identity.";
@@ -1719,10 +1728,11 @@ START_SQ_TEST(SceneSphereSweepVsStaticMeshes_Archipelago, CATEGORY_SWEEP, gDesc_
 
 	virtual bool SceneSphereSweepVsStaticMeshes_Archipelago::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportSphereSweeps)
+		if(!caps.mSupportSphereSweeps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -1776,10 +1786,10 @@ START_SQ_TEST(SceneSphereSweepVsStaticMeshes_KP, CATEGORY_SWEEP, gDesc_SceneSphe
 
 	virtual bool SceneSphereSweepVsStaticMeshes_KP::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportSphereSweeps)
+		if(!caps.mSupportSphereSweeps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword SceneSphereSweepVsStaticMeshes_KP::Update(Pint& pint)
@@ -1816,10 +1826,10 @@ static bool CommonSetup_SceneSphereSweepVsStaticMeshes_TessBunny(TestBase& test,
 
 static bool Setup_SceneSphereSweepVsStaticMeshes_TessBunny(TestBase& test, Pint& pint, const PintCaps& caps)
 {
-	if(!caps.mSupportMeshes || !caps.mSupportSphereSweeps)
+	if(!caps.mSupportSphereSweeps)
 		return false;
 
-	return CreateMeshesFromRegisteredSurfaces(pint, test);
+	return CreateMeshesFromRegisteredSurfaces(pint, caps, test);
 }
 
 static const char* gDesc_SceneSphereSweepVsStaticMeshes_TessBunny = "64 radial sphere-sweeps against the tesselated bunny. Radius of the spheres is 1.0.";
@@ -1889,10 +1899,11 @@ START_SQ_TEST(SceneCapsuleSweepVsStaticMeshes_Archipelago, CATEGORY_SWEEP, gDesc
 
 	virtual bool SceneCapsuleSweepVsStaticMeshes_Archipelago::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportCapsuleSweeps)
+		if(!caps.mSupportCapsuleSweeps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		Point Offset, Extents;
 		GetGlobalBounds(Offset, Extents);
@@ -1959,10 +1970,10 @@ START_SQ_TEST(SceneCapsuleSweepVsStaticMeshes_KP, CATEGORY_SWEEP, gDesc_SceneCap
 
 	virtual bool SceneCapsuleSweepVsStaticMeshes_KP::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportCapsuleSweeps)
+		if(!caps.mSupportCapsuleSweeps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual void SceneCapsuleSweepVsStaticMeshes_KP::CommonUpdate()
@@ -2041,10 +2052,10 @@ START_SQ_TEST(SceneCapsuleSweepVsStaticMeshes_TessBunny, CATEGORY_SWEEP, gDesc_S
 
 	virtual bool SceneCapsuleSweepVsStaticMeshes_TessBunny::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportMeshes || !caps.mSupportCapsuleSweeps)
+		if(!caps.mSupportCapsuleSweeps)
 			return false;
 
-		return CreateMeshesFromRegisteredSurfaces(pint, *this);
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword SceneCapsuleSweepVsStaticMeshes_TessBunny::Update(Pint& pint)
@@ -2106,7 +2117,7 @@ static bool Setup_SceneConvexSweepVsStaticMeshes_TessBunny(PintShapeRenderer* re
 	const udword h = pint.CreateConvexObject(Desc);
 	ASSERT(h==0);
 
-	return CreateMeshesFromRegisteredSurfaces(pint, test);
+	return CreateMeshesFromRegisteredSurfaces(pint, caps, test);
 }
 
 static const char* gDesc_SceneConvexSweepVsStaticMeshes_TessBunny = "64 radial convex-sweeps against the tesselated bunny.";
@@ -2229,11 +2240,10 @@ START_SQ_TEST(BoxSweep_TestZone, CATEGORY_SWEEP, gDesc_BoxSweep_TestZone)
 
 	virtual bool BoxSweep_TestZone::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportBoxSweeps || !caps.mSupportMeshes)
+		if(!caps.mSupportBoxSweeps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword BoxSweep_TestZone::Update(Pint& pint)
@@ -2286,11 +2296,10 @@ START_SQ_TEST(BoxSweep2_TestZone, CATEGORY_SWEEP, gDesc_BoxSweep_TestZone2)
 
 	virtual bool BoxSweep2_TestZone::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportBoxSweeps || !caps.mSupportMeshes)
+		if(!caps.mSupportBoxSweeps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword BoxSweep2_TestZone::Update(Pint& pint)
@@ -2338,11 +2347,10 @@ START_SQ_TEST(SphereSweep_TestZone, CATEGORY_SWEEP, gDesc_SphereSweep_TestZone)
 
 	virtual bool SphereSweep_TestZone::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportSphereSweeps || !caps.mSupportMeshes)
+		if(!caps.mSupportSphereSweeps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword SphereSweep_TestZone::Update(Pint& pint)
@@ -2392,11 +2400,10 @@ START_SQ_TEST(CapsuleSweep_TestZone, CATEGORY_SWEEP, gDesc_CapsuleSweep_TestZone
 
 	virtual bool CapsuleSweep_TestZone::Setup(Pint& pint, const PintCaps& caps)
 	{
-		if(!caps.mSupportCapsuleSweeps || !caps.mSupportMeshes)
+		if(!caps.mSupportCapsuleSweeps)
 			return false;
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
-		return true;
+		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
 	virtual udword CapsuleSweep_TestZone::Update(Pint& pint)

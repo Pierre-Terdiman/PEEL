@@ -595,12 +595,19 @@ START_TEST(VeryLargeTriangle, CATEGORY_CONTACT_GENERATION, gDesc_VeryLargeTriang
 		desc.mCamera[0] = CameraPose(Point(8.68f, 4.96f, 9.24f), Point(-0.56f, -0.25f, -0.79f));
 	}
 
+	virtual bool VeryLargeTriangle::CommonSetup()
+	{
+		CreateSingleTriangleMesh(*this, 5000.0f);
+		mCreateDefaultEnvironment = false;
+		return TestBase::CommonSetup();
+	}
+
 	virtual bool VeryLargeTriangle::Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportRigidBodySimulation)
 			return false;
 
-		if(!CreateSingleTriangleMesh(pint, caps, 5000.0f))
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
 			return false;
 
 		if(1)
@@ -627,10 +634,7 @@ START_TEST(VeryLargeTriangle, CATEGORY_CONTACT_GENERATION, gDesc_VeryLargeTriang
 
 			PintObjectHandle ShapeHandle2 = CreateDynamicObject(pint, &CapsuleDesc, Point(4.0f, Radius*2.0f, 0.0f));
 			ASSERT(ShapeHandle2);
-
 		}
-
-		mCreateDefaultEnvironment = false;
 		return true;
 	}
 
@@ -648,12 +652,9 @@ START_TEST(SphereMeshUnitTest, CATEGORY_CONTACT_GENERATION, gDesc_SphereMeshUnit
 		desc.mCamera[0] = CameraPose(Point(-0.15f, 1.26f, 2.53f), Point(0.16f, -0.31f, -0.94f));
 	}
 
-	virtual bool SphereMeshUnitTest::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool SphereMeshUnitTest::CommonSetup()
 	{
-		if(!caps.mSupportRigidBodySimulation || !caps.mSupportMeshes)
-			return false;
-
-		if(!GetNbSurfaces())
+		ASSERT(!GetNbSurfaces());
 		{
 			const Point Offset(476.00385f, 48.477341f, 854.03748f);
 
@@ -690,8 +691,17 @@ START_TEST(SphereMeshUnitTest, CATEGORY_CONTACT_GENERATION, gDesc_SphereMeshUnit
 				F[j].mRef[2] = j*3+2;
 			}
 		}
+		mCreateDefaultEnvironment = false;
+		return TestBase::CommonSetup();
+	}
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+	virtual bool SphereMeshUnitTest::Setup(Pint& pint, const PintCaps& caps)
+	{
+		if(!caps.mSupportRigidBodySimulation)
+			return false;
+
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		const float Radius = 0.036977537f;
 
@@ -724,12 +734,9 @@ START_TEST(SphereMeshUnitTest_FC, CATEGORY_CONTACT_GENERATION, gDesc_SphereMeshU
 		desc.mCamera[0] = CameraPose(Point(-0.79f, 2.50f, 6.29f), Point(0.16f, -0.31f, -0.94f));
 	}
 
-	virtual bool SphereMeshUnitTest_FC::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool SphereMeshUnitTest_FC::CommonSetup()
 	{
-		if(!caps.mSupportRigidBodySimulation || !caps.mSupportMeshes)
-			return false;
-
-		if(!GetNbSurfaces())
+		ASSERT(!GetNbSurfaces());
 		{
 			const udword NbVerts = 3;
 			Point Verts[NbVerts];
@@ -756,8 +763,17 @@ START_TEST(SphereMeshUnitTest_FC, CATEGORY_CONTACT_GENERATION, gDesc_SphereMeshU
 				F[j].mRef[2] = 1;
 			}
 		}
+		mCreateDefaultEnvironment = false;
+		return TestBase::CommonSetup();
+	}
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+	virtual bool SphereMeshUnitTest_FC::Setup(Pint& pint, const PintCaps& caps)
+	{
+		if(!caps.mSupportRigidBodySimulation)
+			return false;
+
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		const float Radius = 1.0f;
 
@@ -789,12 +805,9 @@ START_TEST(SphereMeshUnitTest_VC, CATEGORY_CONTACT_GENERATION, gDesc_SphereMeshU
 		desc.mCamera[0] = CameraPose(Point(-0.79f, 2.50f, 6.29f), Point(0.16f, -0.31f, -0.94f));
 	}
 
-	virtual bool SphereMeshUnitTest_VC::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool SphereMeshUnitTest_VC::CommonSetup()
 	{
-		if(!caps.mSupportRigidBodySimulation || !caps.mSupportMeshes)
-			return false;
-
-		if(!GetNbSurfaces())
+		ASSERT(!GetNbSurfaces());
 		{
 			const udword NbVerts = 8;
 			Point Verts[NbVerts];
@@ -833,8 +846,17 @@ START_TEST(SphereMeshUnitTest_VC, CATEGORY_CONTACT_GENERATION, gDesc_SphereMeshU
 				F[j].mRef[2] = Indices[j*3+2];
 			}
 		}
+		mCreateDefaultEnvironment = false;
+		return TestBase::CommonSetup();
+	}
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+	virtual bool SphereMeshUnitTest_VC::Setup(Pint& pint, const PintCaps& caps)
+	{
+		if(!caps.mSupportRigidBodySimulation)
+			return false;
+
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		const float Radius = 1.0f;
 
@@ -868,12 +890,9 @@ START_TEST(SphereMeshUnitTest_EC, CATEGORY_CONTACT_GENERATION, gDesc_SphereMeshU
 		desc.mCamera[0] = CameraPose(Point(3.14f, 0.63f, 4.92f), Point(-0.51f, -0.17f, -0.84f));
 	}
 
-	virtual bool SphereMeshUnitTest_EC::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool SphereMeshUnitTest_EC::CommonSetup()
 	{
-		if(!caps.mSupportRigidBodySimulation || !caps.mSupportMeshes)
-			return false;
-
-		if(!GetNbSurfaces())
+		ASSERT(!GetNbSurfaces());
 		{
 			const float Length = 2.0f;
 			const float h = -2.0f;
@@ -913,8 +932,17 @@ START_TEST(SphereMeshUnitTest_EC, CATEGORY_CONTACT_GENERATION, gDesc_SphereMeshU
 				F[j].mRef[2] = Indices[j*3+2];
 			}
 		}
+		mCreateDefaultEnvironment = false;
+		return TestBase::CommonSetup();
+	}
 
-		CreateMeshesFromRegisteredSurfaces(pint, *this);
+	virtual bool SphereMeshUnitTest_EC::Setup(Pint& pint, const PintCaps& caps)
+	{
+		if(!caps.mSupportRigidBodySimulation)
+			return false;
+
+		if(!CreateMeshesFromRegisteredSurfaces(pint, caps, *this))
+			return false;
 
 		const float Radius = 1.0f;
 

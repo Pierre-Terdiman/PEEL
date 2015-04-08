@@ -32,7 +32,7 @@
 #include <mmsystem.h>
 #pragma comment(lib, "winmm.lib")
 
-static const char* gVersion = "1.0";
+static const char* gVersion = "1.01";
 enum RaytracingTestValue
 {
 	RAYTRACING_TEST_DISABLED,

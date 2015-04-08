@@ -8,6 +8,18 @@ Contact email: pierre.terdiman@gmail.com   <= use this first
  
 ---
 
+* april 2015: v1.01 - the Bullet single-triangle-mesh issue
+
+	- the Bullet plugin was crashing or behaving oddly in all scenes featuring the "single triangle" mesh.
+	This has been fixed. The reason was that the triangle's data was not persistent (contrary to what happens
+	for other meshes), and since Bullet does not copy the data, bad things happened. It looks like all the
+	other engines copy the data, since they were working fine. Thanks to Erwin Coumans for figuring out the
+	root of the problem.
+
+	- Opcode2 plugins will not crash anymore in raycast scenes without meshes (they won't do anything though).
+
+---
+
 * april 2015: v1.0 - first public version
 
 	- PINT_Bullet was my initial Bullet PEEL plugin, for version 2.79. It will be deprecated soon, since it
