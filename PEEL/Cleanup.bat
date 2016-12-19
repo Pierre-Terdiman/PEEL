@@ -2,6 +2,9 @@ del PhysicsTest.ncb
 del Debug\PhysicsTest.bsc
 del PEEL.ncb
 del PEEL.bsc
+del PEEL.suo
+ECHO Y | del /S *.*pterdiman.user
+ECHO Y | del /S *.*pierre.user
 ECHO Y | del Physics\Debug\*.*
 ECHO Y | del Physics\Release\*.*
 ECHO Y | del Physics\NovodexVC9\SDKs\Physics\compiler\vc9\Debug\*.*
