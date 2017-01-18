@@ -17,6 +17,7 @@
 								GraphDesc();
 
 				GraphStyle		mGraphStyle;
+				bool			mEnablePopupMenu;
 	};
 
 	// Separate class with a private section, to make sure nobody changes the keys without sending a user callback.
@@ -84,6 +85,7 @@
 				udword					mSelected;
 				bool					mTrackY;
 				bool					mHasMoved;
+				bool					mEnablePopupMenu;
 	};
 
 #endif	// ICEGRAPHWINDOW_H

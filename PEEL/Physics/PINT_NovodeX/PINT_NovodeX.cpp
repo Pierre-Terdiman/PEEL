@@ -6,6 +6,10 @@
  */
 ///////////////////////////////////////////////////////////////////////////////
 
+// NovodeX DLLs:
+// - NxFoundation.dll
+// - NxPhysics.dll
+
 #include "stdafx.h"
 #include "PINT_Novodex.h"
 #include "..\PINT_Common\PINT_Common.h"
@@ -216,22 +220,14 @@ void NovodeX::GetCaps(PintCaps& caps) const
 	caps.mSupportKinematics				= true;
 	caps.mSupportCollisionGroups		= true;
 	caps.mSupportCompounds				= true;
-	caps.mSupportConvexes				= false;
 	caps.mSupportMeshes					= true;
 	caps.mSupportSphericalJoints		= true;
 	caps.mSupportHingeJoints			= true;
 	caps.mSupportFixedJoints			= true;
 	caps.mSupportPrismaticJoints		= true;
-	caps.mSupportPhantoms				= false;
+	caps.mSupportDistanceJoints			= true;
 	caps.mSupportRaycasts				= true;
-	caps.mSupportBoxSweeps				= false;
-	caps.mSupportSphereSweeps			= false;
-	caps.mSupportCapsuleSweeps			= false;
-	caps.mSupportConvexSweeps			= false;
 	caps.mSupportSphereOverlaps			= true;
-	caps.mSupportBoxOverlaps			= false;
-	caps.mSupportCapsuleOverlaps		= false;
-	caps.mSupportConvexOverlaps			= false;
 }
 
 void NovodeX::Init(const PINT_WORLD_CREATE& desc)
@@ -476,7 +472,7 @@ PintObjectHandle NovodeX::CreateObject(const PINT_OBJECT_CREATE& desc)
 		bodyDesc.wakeUpCounter		= 999999999.0f;
 	bodyDesc.linearDamping			= gLinearDamping;
 	bodyDesc.angularDamping			= gAngularDamping;
-//	bodyDesc.maxAngularVelocity		= ;
+	bodyDesc.maxAngularVelocity		= 100.0f;
 	bodyDesc.flags					= desc.mKinematic ? NX_BF_KINEMATIC : 0;
 //	bodyDesc.sleepLinearVelocity	= ;
 //	bodyDesc.sleepAngularVelocity	= ;
@@ -536,6 +532,30 @@ PintObjectHandle NovodeX::CreateObject(const PINT_OBJECT_CREATE& desc)
 			meshDesc.triangles				= MeshCreate->mSurface.mDFaces;
 //			meshDesc.flags					= NX_MF_FLIPNORMALS;
 			meshDesc.flags					= 0;
+
+			if(0)
+			{
+				IceFile PGOData("c:\\pgodata.bin");
+				if(PGOData.IsValid())
+				{
+					const udword CurrentMeshID = mMeshes.size();
+
+					meshDesc.pgoData = new NxU32[meshDesc.numTriangles];
+					ZeroMemory(meshDesc.pgoData, sizeof(NxU32)*meshDesc.numTriangles);
+
+					udword Length;
+					const udword* data = (const udword*)PGOData.Load(Length);
+					for(udword i=0;i<Length/8;i++)
+					{
+						const udword MeshID = *data++;
+						const udword FaceID = *data++;
+						if(MeshID==CurrentMeshID)
+						{
+							meshDesc.pgoData[FaceID]++;
+						}
+					}
+				}
+			}
 
 			NxTriangleMesh* TriMesh = mSDK->createTriangleMesh(meshDesc);
 			mMeshes.push_back(TriMesh);
@@ -774,6 +794,32 @@ PintJointHandle NovodeX::CreateJoint(const PINT_JOINT_CREATE& desc)
 			ASSERT(CreatedJoint);
 		}
 		break;
+
+		case PINT_JOINT_DISTANCE:
+		{
+			const PINT_DISTANCE_JOINT_CREATE& jc = static_cast<const PINT_DISTANCE_JOINT_CREATE&>(desc);
+
+			NxDistanceJointDesc Desc;
+			SetupJointDesc(Desc);
+			Desc.actor[0]		= actor0->isDynamic() ? actor0 : null;
+			Desc.actor[1]		= actor1->isDynamic() ? actor1 : null;
+			Desc.localAnchor[0] = actor0->isDynamic() ? ToNxVec3(jc.mLocalPivot0) : actor0->getGlobalPose().t;
+			Desc.localAnchor[1] = actor1->isDynamic() ? ToNxVec3(jc.mLocalPivot1) : actor1->getGlobalPose().t;
+			Desc.flags = 0;
+			if(jc.mMaxDistance>=0.0f)
+			{
+				Desc.maxDistance	= jc.mMaxDistance;
+				Desc.flags			|= NX_DJF_MAX_DISTANCE_ENABLED;
+			}
+			if(jc.mMinDistance>=0.0f)
+			{
+				Desc.minDistance	= jc.mMinDistance;
+				Desc.flags			|= NX_DJF_MIN_DISTANCE_ENABLED;
+			}
+			CreatedJoint = mScene->createJoint(Desc);
+			ASSERT(CreatedJoint);
+		}
+		break;
 	}
 	return CreatedJoint;
 }
@@ -823,6 +869,83 @@ udword NovodeX::BatchRaycasts(PintSQThreadContext context, udword nb, PintRaycas
 		raycasts++;
 		dest++;
 	}
+#endif
+
+//#define XPCODE	// ### cant work since rays must be in local space
+#ifdef XPCODE
+	NxRay worldRays[2048];
+	NxRaycastHit hits[2048];
+	while(nb)
+	{
+		const udword NbToGo = MIN(nb, 2048);
+//		const udword NbToGo = MIN(nb, 1024);
+//		const udword NbToGo = MIN(nb, 256);
+
+		for(udword i=0;i<NbToGo;i++)
+		{
+			worldRays[i].orig = ToNxVec3(raycasts[i].mOrigin);
+			worldRays[i].dir = ToNxVec3(raycasts[i].mDir);
+			hits[i].faceID = INVALID_ID;
+			hits[i].distance = raycasts[i].mMaxDist;
+		}
+
+		mScene->raycastClosestShapeMulti(NbToGo, worldRays, hits, NX_ALL_SHAPES, groups, hintFlags);
+
+		for(udword i=0;i<NbToGo;i++)
+		{
+			if(hits[i].faceID!=INVALID_ID)
+			{
+				NbHits++;
+				FillResultStruct(dest[i], hits[i]);
+			}
+			else dest[i].mObject = null;
+		}
+
+		nb -= NbToGo;
+		raycasts += NbToGo;
+		dest += NbToGo;
+	}
+#endif
+
+//#define GENERATE_PGODATA
+#ifdef GENERATE_PGODATA
+//	FILE* fp = fopen("c:\\pgodata.txt", "w");
+	FILE* fp = fopen("c:\\pgodata.bin", "wb");
+	NxRaycastHit Hit;
+	while(nb--)
+	{
+		const NxRay worldRay(ToNxVec3(raycasts->mOrigin), ToNxVec3(raycasts->mDir));
+
+		if(mScene->raycastClosestShape(worldRay, NX_ALL_SHAPES, Hit, groups, raycasts->mMaxDist, hintFlags))
+		{
+			NbHits++;
+			FillResultStruct(*dest, Hit);
+
+			NxShape* touchedShape = Hit.shape;
+			NxTriangleMeshShape* meshShape = touchedShape->isTriangleMesh();
+			NxTriangleMesh& triMesh = meshShape->getTriangleMesh();
+			udword MeshIndex = INVALID_ID;
+			for(udword i=0;i<mMeshes.size();i++)
+			{
+				if(mMeshes[i]==&triMesh)
+				{
+					MeshIndex = i;
+				}
+			}
+			ASSERT(MeshIndex!=INVALID_ID);
+
+//			fprintf(fp, "%d - %d\n", MeshIndex, Hit.faceID);
+			fwrite(&MeshIndex, 1, sizeof(udword), fp);
+			fwrite(&Hit.faceID, 1, sizeof(udword), fp);
+		}
+		else
+		{
+			dest->mObject = null;
+		}
+		raycasts++;
+		dest++;
+	}
+	fclose(fp);
 #endif
 
 	mScene->dumpRaycastStats();
@@ -899,7 +1022,7 @@ PR NovodeX::GetWorldTransform(PintObjectHandle handle)
 	return PR(ToPoint(Pos), ToQuat(Q));
 }
 
-void NovodeX::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
+/*void NovodeX::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
 {
 	NxActor* Actor = GetActorFromHandle(handle);
 	if(!Actor)
@@ -920,6 +1043,20 @@ void NovodeX::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_
 
 		Actor->addForceAtPos(ToNxVec3(action), ToNxVec3(pos), mode);
 	}
+}*/
+
+void NovodeX::AddWorldImpulseAtWorldPos(PintObjectHandle handle, const Point& world_impulse, const Point& world_pos)
+{
+	NxActor* Actor = GetActorFromHandle(handle);
+	if(!Actor)
+	{
+		NxShape* Shape = GetShapeFromHandle(handle);
+		ASSERT(Shape);
+		Actor = &Shape->getActor();
+	}
+
+	if(Actor->isDynamic())
+		Actor->addForceAtPos(ToNxVec3(world_impulse), ToNxVec3(world_pos), NX_IMPULSE);
 }
 
 bool NovodeX::SetKinematicPose(PintObjectHandle handle, const Point& pos)

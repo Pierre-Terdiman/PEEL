@@ -10,11 +10,13 @@
 #define PINT_PHYSX332_H
 
 #include "..\Pint.h"
+#include "..\PINT_Common\PINT_CommonPhysX3.h"
+#include "..\PINT_Common\PINT_CommonPhysX3_Vehicles.h"
 
-	class PhysX : public Pint
+	class PhysX : public SharedPhysX_Vehicles
 	{
 		public:
-													PhysX();
+													PhysX(const EditableParams& params);
 		virtual										~PhysX();
 
 		// Pint
@@ -25,78 +27,27 @@
 #endif
 		virtual	void								GetCaps(PintCaps& caps)	const;
 		virtual	void								Init(const PINT_WORLD_CREATE& desc);
-		virtual	void								SetGravity(const Point& gravity);
 		virtual	void								Close();
 		virtual	udword								Update(float dt);
 		virtual	Point								GetMainColor();
-		virtual	void								Render(PintRender& renderer);
-
-		virtual	void								SetDisabledGroups(udword nb_groups, const PintDisabledGroups* groups);
-		virtual	PintObjectHandle					CreateObject(const PINT_OBJECT_CREATE& desc);
-		virtual	bool								ReleaseObject(PintObjectHandle handle);
-		virtual	PintJointHandle						CreateJoint(const PINT_JOINT_CREATE& desc);
 
 		virtual	void*								CreatePhantom(const AABB& box);
 		virtual	udword								BatchRaycastsPhantom(udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts, void**);
 
 		//
 		virtual	udword								BatchRaycasts				(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts);
-		virtual	udword								BatchRaycastAny				(PintSQThreadContext context, udword nb, PintBooleanHit* dest, const PintRaycastData* raycasts);
 		virtual	udword								BatchRaycastAll				(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintRaycastData* raycasts);
 		//
 		virtual	udword								BatchBoxSweeps				(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintBoxSweepData* sweeps);
 		virtual	udword								BatchSphereSweeps			(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintSphereSweepData* sweeps);
 		virtual	udword								BatchCapsuleSweeps			(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintCapsuleSweepData* sweeps);
 		//
-		virtual	udword								BatchSphereOverlapAny		(PintSQThreadContext context, udword nb, PintBooleanHit* dest, const PintSphereOverlapData* overlaps);
-		virtual	udword								BatchSphereOverlapObjects	(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintSphereOverlapData* overlaps);
-		virtual	udword								BatchBoxOverlapAny			(PintSQThreadContext context, udword nb, PintBooleanHit* dest, const PintBoxOverlapData* overlaps);
-		virtual	udword								BatchBoxOverlapObjects		(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintBoxOverlapData* overlaps);
-		virtual	udword								BatchCapsuleOverlapAny		(PintSQThreadContext context, udword nb, PintBooleanHit* dest, const PintCapsuleOverlapData* overlaps);
-		virtual	udword								BatchCapsuleOverlapObjects	(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintCapsuleOverlapData* overlaps);
-		//
-		virtual	udword								FindTriangles_MeshSphereOverlap	(PintSQThreadContext context, PintObjectHandle handle, udword nb, const PintSphereOverlapData* overlaps);
-		virtual	udword								FindTriangles_MeshBoxOverlap	(PintSQThreadContext context, PintObjectHandle handle, udword nb, const PintBoxOverlapData* overlaps);
-		virtual	udword								FindTriangles_MeshCapsuleOverlap(PintSQThreadContext context, PintObjectHandle handle, udword nb, const PintCapsuleOverlapData* overlaps);
 
-		virtual	PR									GetWorldTransform(PintObjectHandle handle);
-		virtual	void								ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos);
-
-		// XP
-		virtual	udword								GetShapes(PintObjectHandle* shapes, PintObjectHandle handle);
-		virtual	void								SetLocalRot(PintObjectHandle handle, const Quat& q);
-		virtual	bool								GetConvexData(PintObjectHandle handle, PINT_CONVEX_CREATE& data);
-
-		virtual	bool								SetKinematicPose(PintObjectHandle handle, const Point& pos);
-
-		virtual	udword								CreateConvexObject(const PINT_CONVEX_DATA_CREATE& desc);
 		virtual	udword								BatchConvexSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintConvexSweepData* sweeps);
 		//~Pint
 
 				void								UpdateFromUI();
 		private:
-				struct ConvexRender
-				{
-					ConvexRender(PxConvexMesh* convexMesh, PintShapeRenderer* renderer) :
-						mConvexMesh	(convexMesh),
-						mRenderer	(renderer)
-					{
-					}
-					PxConvexMesh*					mConvexMesh;
-					PintShapeRenderer*				mRenderer;
-				};
-
-				struct MeshRender
-				{
-					MeshRender(PxTriangleMesh* triMesh, PintShapeRenderer* renderer) :
-						mTriangleMesh	(triMesh),
-						mRenderer		(renderer)
-					{
-					}
-					PxTriangleMesh*					mTriangleMesh;
-					PintShapeRenderer*				mRenderer;
-				};
-
 				struct InternalShape
 				{
 					InternalShape(PxShape* shape, const PxMaterial* material, const PxTransform& local_pose, PxU16 collision_group) :
@@ -170,32 +121,18 @@
 					PxConvexMesh*					mConvexMesh;
 				};
 
-				PxFoundation*						mFoundation;
 				PxProfileZoneManager*				mProfileZoneManager;
-				PxPhysics*							mPhysics;
-				PxCooking*							mCooking;
-				PxScene*							mScene;
-				PxMaterial*							mDefaultMaterial;
-
-
-				std::vector<PxMaterial*>			mMaterials;
-				std::vector<ConvexRender>			mConvexes;
-				std::vector<MeshRender>				mMeshes;
-				PxMaterial*							CreateMaterial(const PINT_MATERIAL_CREATE& desc);
-				PxConvexMesh*						CreateConvexMesh(const Point* verts, udword vertCount, PxConvexFlags flags, PintShapeRenderer* renderer);
-				PxTriangleMesh*						CreateTriangleMesh(const SurfaceInterface& surface, PintShapeRenderer* renderer);
 
 				std::vector<InternalSphereShape>	mSphereShapes;
 				std::vector<InternalBoxShape>		mBoxShapes;
 				std::vector<InternalCapsuleShape>	mCapsuleShapes;
 				std::vector<InternalConvexShape>	mConvexShapes;
 
-				std::vector<PxConvexMesh*>			mConvexObjects;
-
 				PxShape*							CreateSphereShape	(const PINT_SHAPE_CREATE* create, PxRigidActor* actor, const PxSphereGeometry& geometry,		const PxMaterial& material, const PxTransform& local_pose, PxU16 collision_group);
 				PxShape*							CreateBoxShape		(const PINT_SHAPE_CREATE* create, PxRigidActor* actor, const PxBoxGeometry& geometry,			const PxMaterial& material, const PxTransform& local_pose, PxU16 collision_group);
 				PxShape*							CreateCapsuleShape	(const PINT_SHAPE_CREATE* create, PxRigidActor* actor, const PxCapsuleGeometry& geometry,		const PxMaterial& material, const PxTransform& local_pose, PxU16 collision_group);
 				PxShape*							CreateConvexShape	(const PINT_SHAPE_CREATE* create, PxRigidActor* actor, const PxConvexMeshGeometry& geometry,	const PxMaterial& material, const PxTransform& local_pose, PxU16 collision_group);
+				void								CreateShapes(const PINT_OBJECT_CREATE& desc, PxRigidActor* actor);
 	};
 
 	IceWindow*	PhysX_InitGUI(IceWidget* parent, PintGUIHelper& helper);

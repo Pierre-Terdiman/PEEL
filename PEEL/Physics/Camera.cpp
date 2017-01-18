@@ -171,7 +171,6 @@ static const float NxPiF32 = 3.141592653589793f;
 void RotateCamera(int dx, int dy)
 {
 	const Point Up(0.0f, 1.0f, 0.0f);
-
 	gDir.Normalize();
 	gViewY = gDir^Up;
 
@@ -182,13 +181,57 @@ void RotateCamera(int dx, int dy)
 	qy.rotate(gDir);
 }
 
-void SetupCameraMatrix()
+extern udword gScreenWidth;
+extern udword gScreenHeight;
+
+void SetupCameraMatrix(float z_near, float z_far)
 {
+	const Point Up(0.0f, 1.0f, 0.0f);
+	gDir.Normalize();
+	gViewY = gDir^Up;
+
+	const float Width	= float(gScreenWidth);
+	const float Height	= float(gScreenHeight);
+
 	glLoadIdentity();
-	gluPerspective(gFOV, ((float)glutGet(GLUT_WINDOW_WIDTH))/((float)glutGet(GLUT_WINDOW_HEIGHT)), 1.0f, 10000.0f);
+	gluPerspective(gFOV, Width/Height, z_near, z_far);
+//	gluPerspective(gFOV, 1.0f, z_near, z_far);
+//	gluPerspective(gFOV, ((float)glutGet(GLUT_WINDOW_WIDTH))/((float)glutGet(GLUT_WINDOW_HEIGHT)), z_near, z_far);
 	gluLookAt(gEye.x, gEye.y, gEye.z, gEye.x + gDir.x, gEye.y + gDir.y, gEye.z + gDir.z, 0.0f, 1.0f, 0.0f);
 }
 
+
+#define NEW_VERSION
+#ifdef NEW_VERSION
+// Fetched from the old ICE renderer. More accurate and MUCH faster than the previous crazy gluUnProject-based version...
+Point ComputeWorldRay(int xs, int ys)
+{
+	// Catch width & height
+	const float Width	= float(gScreenWidth);
+	const float Height	= float(gScreenHeight);
+
+	// Recenter coordinates in camera space ([-1, 1])
+	const float u = ((xs - Width*0.5f)/Width)*2.0f;
+	const float v = -((ys - Height*0.5f)/Height)*2.0f;
+
+	// Adjust coordinates according to camera aspect ratio
+	const float HTan = tanf(0.25f * fabsf(DEGTORAD * gFOV * 2.0f));
+	const float VTan = HTan*(Width/Height);
+
+	// Ray in camera space
+	const Point CamRay(VTan*u, HTan*v, 1.0f);
+
+	// Compute ray in world space
+	Matrix3x3 InvView;
+	Point Right, Up;
+	ComputeBasis(gDir, Right, Up);
+	InvView.SetCol(0, -Right);
+	InvView.SetCol(1, Up);
+	InvView.SetCol(2, gDir);
+
+	return (InvView * CamRay).Normalize();
+}
+#else
 Point ComputeWorldRay(int xs, int ys)
 {
 	GLint viewPort[4];
@@ -197,12 +240,20 @@ Point ComputeWorldRay(int xs, int ys)
 	glGetIntegerv(GL_VIEWPORT, viewPort);
 	glGetDoublev(GL_MODELVIEW_MATRIX, modelMatrix);
 	glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
+
 	ys = viewPort[3] - ys - 1;
 	GLdouble wx0, wy0, wz0;
 	gluUnProject((GLdouble) xs, (GLdouble) ys, 0.0, modelMatrix, projMatrix, viewPort, &wx0, &wy0, &wz0);
 	GLdouble wx1, wy1, wz1;
-	gluUnProject((GLdouble) xs, (GLdouble) ys, 1.0, modelMatrix, projMatrix, viewPort, &wx1, &wy1, &wz1);
+	int ret = gluUnProject((GLdouble) xs, (GLdouble) ys, 1.0, modelMatrix, projMatrix, viewPort, &wx1, &wy1, &wz1);
+	if(!ret)
+		printf("gluUnProject failed\n");
 	Point tmp(float(wx1-wx0), float(wy1-wy0), float(wz1-wz0));
 	tmp.Normalize();
+
+	if(tmp.Dot(gDir)<0.0f)
+		tmp = -tmp;
+
 	return tmp;
 }
+#endif

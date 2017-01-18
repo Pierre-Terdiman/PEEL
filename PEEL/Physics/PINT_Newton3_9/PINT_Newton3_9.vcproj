@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9,00"
+	Version="9.00"
 	Name="PINT_Newton_3_9"
 	ProjectGUID="{5E84F6A0-F390-47D1-A113-28693BFBADB5}"
 	RootNamespace="PINT_Newton_3_9"
@@ -425,6 +425,14 @@
 				</File>
 				<File
 					RelativePath="..\PINT_Common\PINT_Common.h"
+					>
+				</File>
+				<File
+					RelativePath="..\PINT_Common\PINT_CommonNewton.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\PINT_Common\PINT_CommonNewton.h"
 					>
 				</File>
 				<File

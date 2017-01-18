@@ -6,6 +6,10 @@
  */
 ///////////////////////////////////////////////////////////////////////////////
 
+// PhysX 3.1 DLLs:
+// - PhysX3Cooking_x86.dll
+// - PhysX3_x86.dll
+
 #include "stdafx.h"
 #include "PINT_PhysX31.h"
 #include "..\PINT_Common\PINT_Common.h"
@@ -521,7 +525,6 @@ PhysX::~PhysX()
 void PhysX::GetCaps(PintCaps& caps) const
 {
 	caps.mSupportRigidBodySimulation	= true;
-	caps.mSupportKinematics				= false;
 	caps.mSupportCollisionGroups		= true;
 	caps.mSupportCompounds				= true;
 	caps.mSupportConvexes				= true;
@@ -530,16 +533,11 @@ void PhysX::GetCaps(PintCaps& caps) const
 	caps.mSupportHingeJoints			= true;
 	caps.mSupportFixedJoints			= true;
 	caps.mSupportPrismaticJoints		= true;
-	caps.mSupportPhantoms				= false;
 	caps.mSupportRaycasts				= true;
 	caps.mSupportBoxSweeps				= true;
 	caps.mSupportSphereSweeps			= true;
 	caps.mSupportCapsuleSweeps			= true;
-	caps.mSupportConvexSweeps			= false;
 	caps.mSupportSphereOverlaps			= true;
-	caps.mSupportBoxOverlaps			= false;
-	caps.mSupportCapsuleOverlaps		= false;
-	caps.mSupportConvexOverlaps			= false;
 }
 
 static PxFilterFlags CCDSimulationFilterShader(
@@ -1068,9 +1066,19 @@ PintObjectHandle PhysX::CreateObject(const PINT_OBJECT_CREATE& desc)
 		rigidDynamic->setAngularDamping(gAngularDamping);
 		rigidDynamic->setLinearVelocity(ToPxVec3(desc.mLinearVelocity));
 		rigidDynamic->setAngularVelocity(ToPxVec3(desc.mAngularVelocity));
-//		rigidDynamic->setMass(create.mMass);
-		bool status = PxRigidBodyExt::setMassAndUpdateInertia(*rigidDynamic, desc.mMass);
-		ASSERT(status);
+		rigidDynamic->setMaxAngularVelocity(100.0f);
+//		PhysX3::SetMassProperties(desc, *rigidDynamic);
+		{
+			bool status = PxRigidBodyExt::setMassAndUpdateInertia(*rigidDynamic, desc.mMass);
+			ASSERT(status);
+
+			if(desc.mCOMLocalOffset.IsNonZero())
+			{
+				PxTransform Pose = rigidDynamic->getCMassLocalPose();
+				Pose.p += ToPxVec3(desc.mCOMLocalOffset);
+				rigidDynamic->setCMassLocalPose(Pose);
+			}
+		}
 
 		if(!gEnableSleeping)
 			rigidDynamic->wakeUp(9999999999.0f);
@@ -1491,7 +1499,7 @@ PR PhysX::GetWorldTransform(PintObjectHandle handle)
 	return PR(ToPoint(Pose.p), ToQuat(Pose.q));
 }
 
-void PhysX::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
+/*void PhysX::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
 {
 	PxRigidActor* RigidActor = GetActorFromHandle(handle);
 	if(!RigidActor)
@@ -1514,7 +1522,58 @@ void PhysX::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_ty
 
 		PxRigidBodyExt::addForceAtPos(*RigidDynamic, ToPxVec3(action), ToPxVec3(pos), mode);
 	}
+}*/
+
+void PhysX::AddWorldImpulseAtWorldPos(PintObjectHandle handle, const Point& world_impulse, const Point& world_pos)
+{
+	PxRigidActor* RigidActor = GetActorFromHandle(handle);
+	if(!RigidActor)
+	{
+		PxShape* Shape = GetShapeFromHandle(handle);
+		ASSERT(Shape);
+		RigidActor = &Shape->getActor();
+	}
+
+	if(RigidActor->getType()==PxActorType::eRIGID_DYNAMIC)
+	{
+		PxRigidDynamic* RigidDynamic = static_cast<PxRigidDynamic*>(RigidActor);
+		PxRigidBodyExt::addForceAtPos(*RigidDynamic, ToPxVec3(world_impulse), ToPxVec3(world_pos), PxForceMode::eIMPULSE);
+	}
 }
+
+void PhysX::AddLocalTorque(PintObjectHandle handle, const Point& local_torque)
+{
+	PxRigidActor* RigidActor = GetActorFromHandle(handle);
+	if(!RigidActor)
+	{
+		PxShape* Shape = GetShapeFromHandle(handle);
+		ASSERT(Shape);
+		RigidActor = &Shape->getActor();
+	}
+
+	if(RigidActor->getType()==PxActorType::eRIGID_DYNAMIC)
+	{
+		PxRigidDynamic* RigidDynamic = static_cast<PxRigidDynamic*>(RigidActor);
+		const PxVec3 GlobalTorque = RigidDynamic->getGlobalPose().rotate(ToPxVec3(local_torque));
+		RigidDynamic->addTorque(GlobalTorque, PxForceMode::eACCELERATION, true);
+	}
+}
+
+/*float PhysX::GetMass(PintObjectHandle handle)
+{
+	PxRigidBody* RigidBody = PhysX3::GetRigidBody(handle);
+	if(!RigidBody)
+		return 0.0f;
+	return RigidBody->getMass();
+}
+
+Point PhysX::GetLocalInertia(PintObjectHandle handle)
+{
+	PxRigidBody* RigidBody = PhysX3::GetRigidBody(handle);
+	if(!RigidBody)
+		return Point(0.0f, 0.0f, 0.0f);
+	return ToPoint(RigidBody->getMassSpaceInertiaTensor());
+}*/
 
 udword PhysX::GetShapes(PintObjectHandle* shapes, PintObjectHandle handle)
 {
@@ -1532,35 +1591,16 @@ void PhysX::SetLocalRot(PintObjectHandle handle, const Quat& q)
 	Shape->setLocalPose(lp);
 }
 
-bool PhysX::GetConvexData(PintObjectHandle handle, PINT_CONVEX_CREATE& data)
-{
-	PxShape* Shape = GetShapeFromHandle(handle);
-	if(!Shape)
-	{
-		PxRigidActor* RigidActor = GetActorFromHandle(handle);
-		ASSERT(RigidActor);
-		udword NbShapes = RigidActor->getNbShapes();
-		if(NbShapes!=1)
-			return false;
-		RigidActor->getShapes(&Shape, 1);
-	}
-
-	PxConvexMeshGeometry geometry;
-	if(!Shape->getConvexMeshGeometry(geometry))
-		return false;
-
-	data.mNbVerts	= geometry.convexMesh->getNbVertices();
-	data.mVerts		= (const Point*)geometry.convexMesh->getVertices();
-	return true;	
-}
-
-
 static PhysX* gPhysX = null;
 static void gPhysX_GetOptionsFromGUI();
 
 void PhysX_Init(const PINT_WORLD_CREATE& desc)
 {
 	gPhysX_GetOptionsFromGUI();
+
+//	for(PxU16 j=0;j<32;j++)
+//		for(PxU16 i=0;i<32;i++)
+//			PxSetGroupCollisionFlag(i, j, true);
 
 	ASSERT(!gPhysX);
 	gPhysX = ICE_NEW(PhysX);

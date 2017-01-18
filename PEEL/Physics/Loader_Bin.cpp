@@ -253,7 +253,7 @@ static bool SaveBIN(const char* filename, const IndexedSurface& surface)
 	return true;
 }
 
-static void Tesselate(IndexedSurface* IS, udword level, TesselationScheme ts)
+static void Tessellate(IndexedSurface* IS, udword level, TessellationScheme ts)
 {
 	while(level--)
 	{
@@ -270,7 +270,7 @@ static void Tesselate(IndexedSurface* IS, udword level, TesselationScheme ts)
 	}
 }
 
-static bool LoadBIN(const char* filename, SurfaceManager& test, const float* scale=null, bool mergeMeshes=false, udword tesselation=0, TesselationScheme ts = TESS_BUTTERFLY)
+static bool LoadBIN(const char* filename, SurfaceManager& test, const float* scale=null, bool mergeMeshes=false, udword tessellation=0, TessellationScheme ts = TESS_BUTTERFLY)
 {
 	IceFile BinFile(filename);
 	if(!BinFile.IsValid())
@@ -328,9 +328,9 @@ static bool LoadBIN(const char* filename, SurfaceManager& test, const float* sca
 				F[j].mRef[2] = BinFile.LoadDword();
 			}
 
-/*			if(tesselation)
+/*			if(tessellation)
 			{
-				for(udword j=0;j<tesselation;j++)
+				for(udword j=0;j<tessellation;j++)
 				{
 					if(ts==TESS_BUTTERFLY)
 					{
@@ -344,8 +344,8 @@ static bool LoadBIN(const char* filename, SurfaceManager& test, const float* sca
 					}
 				}
 			}*/
-			if(tesselation)
-				Tesselate(IS, tesselation, ts);
+			if(tessellation)
+				Tessellate(IS, tessellation, ts);
 
 			if(gUseMeshCleaner)
 			{
@@ -397,16 +397,16 @@ static bool LoadBIN(const char* filename, SurfaceManager& test, const float* sca
 			IS->Merge(&LocalIS);
 		}
 
-/*		if(tesselation)
+/*		if(tessellation)
 		{
-			for(udword j=0;j<tesselation;j++)
+			for(udword j=0;j<tessellation;j++)
 			{
 				ButterflyScheme BS;
 				IS->Subdivide(BS);
 			}
 		}*/
-		if(tesselation)
-			Tesselate(IS, tesselation, ts);
+		if(tessellation)
+			Tessellate(IS, tessellation, ts);
 
 		TotalNbTris = IS->GetNbFaces();
 		TotalNbVerts = IS->GetNbVerts();
@@ -421,17 +421,17 @@ static bool LoadBIN(const char* filename, SurfaceManager& test, const float* sca
 	return true;
 }
 
-void LoadMeshesFromFile_(SurfaceManager& test, const char* filename, const float* scale, bool mergeMeshes, udword tesselation, TesselationScheme ts)
+void LoadMeshesFromFile_(SurfaceManager& test, const char* filename, const float* scale, bool mergeMeshes, udword tessellation, TessellationScheme ts)
 {
 	ASSERT(filename);
 	ASSERT(!test.GetNbSurfaces());
 
 	const char* File = FindPEELFile(filename);
-	if(!File || !LoadBIN(File, test, scale, mergeMeshes, tesselation, ts))
+	if(!File || !LoadBIN(File, test, scale, mergeMeshes, tessellation, ts))
 		printf(_F("Failed to load '%s'\n", filename));
 
-//	if(!LoadBIN(_F("../build/%s", filename), test, scale, mergeMeshes, tesselation, ts))
-//		if(!LoadBIN(_F("./%s", filename), test, scale, mergeMeshes, tesselation, ts))
+//	if(!LoadBIN(_F("../build/%s", filename), test, scale, mergeMeshes, tessellation, ts))
+//		if(!LoadBIN(_F("./%s", filename), test, scale, mergeMeshes, tessellation, ts))
 //			printf(_F("Failed to load '%s'\n", filename));
 }
 

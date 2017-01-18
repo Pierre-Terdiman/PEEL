@@ -5,10 +5,100 @@ PEEL was created by Pierre Terdiman (author of Opcode, co-author of NovodeX, sen
 
 Contact email: pierre.terdiman@gmail.com   <= use this first
                pierre@codercorner.com      <= use this the day the first one becomes obsolete
- 
+
+* January 2017: v1.1 - the PhysX 3.4 issue.
+
+	This new version celebrates the official release of PhysX 3.4 and its built-in support for GPU rigid bodies.
+	There is now a "Use GPU" checkbox in the PhysX 3.4's options panel. Just check that box to run the scenes
+	on the GPU. It uses CUDA, so you need an Nvidia graphics card for this to work - and a recent one for good
+	performance. Otherwise the regular CPU version is of course still the default, and it runs everywhere.
+
+	Many changes have been made over the last two years. Some of them are listed below:
+
+	- PEEL app:
+		- implemented smoother camera motion (when using cursor keys).
+		- added support for prismatic joint limits.
+		- added support for distance joints (only exposed in PhysX so far).
+		- added support for cylinder shapes.
+		- added support for articulations (PhysX).
+		- added support for aggregates (PhysX). This improves performance of ragdoll scenes quite a bit.
+		- added initial/experimental support for vehicles.
+		- various test scenes have been added or revisited.
+		- introduced support for configurable tests (per-test UI dialog). As a result, some similar-looking
+		tests have been merged together.
+		- added tool-specific UI to edit tool-specific parameters. For example the picking force can now
+		be modified in the main UI.
+		- added camera tracking tool.
+		- added support for per-test keyboard controls etc.
+		- improved wireframe overlay rendering ('X' key). Now enabled by default.
+		- new Pint caps have been added, as well as comments explaining their role better.
+		- new test categories have been added.
+		- tests can now access the font renderer to draw some debug text on screen. See for example the
+		"AngularVelocity" test in the API category.
+		- tests can now access the debug renderer to draw some debug data on screen. See for example the
+		"COMLocalOffset" test in the API category.
+		- replaced "ComputeWorldRay" with its ICE counterpart to fix some accuracy & performance issues
+		in the raytracing test. The raytracing test became an order of magnitude faster after that.
+	- Stats plugin:
+		- now displays gravity vector.
+		- added support for articulations & aggregates.
+	- Bullet:
+		- added new PINT plugin for "Bullet3-2.85.1" (from Oct 15, 2016).
+		- Bullet3-2.85.1: exposed more solver settings to the UI for this version. I also set the default
+		"erp" value to 0.8 for this plugin, which improves the behavior a lot in jointed scenes like for
+		example FixedJointsTorusStressTest. In previous Bullet plugins however I kept Bullet's own default
+		value (0.2) because increasing it to 0.8 creates "dancing stacks" (see e.g. LargeBoxStack30).
+		- Bullet3-2.85.1: for this version I used 4 solver iterations by default, since this is what PEEL
+		also uses for other physics engines. It should then be a little bit faster than before, since we
+		used 5 iterations by default in the previous Bullet plugins (2.79 to 2.82). However I noticed
+		that Bullet's own default value is now 10 iterations. Not sure if this is really necessary. Play
+		with the settings until you find a good compromise.
+		- constraints are now properly released.
+		- collision margin has been reduced. That way the ConvexStack2 test doesn't explode anymore.
+		- support for cylinders has been added.
+	- Newton:
+		- Newton's PINT plugin has been revisited by Julio Jerez.
+		- sleeping can now be deactivated (except in 3.14).
+		- the per-test gravity vector is now taken into account (it was previously ignored).
+		- we can now use Newton 3.9 and 3.13 at the same time: I just switched to static libs for 3.13.
+		- the 3.13 libraries have been updated. It is now using the stable version from Jun 17, 2015.
+		- added new PINT plugin for Newton 3.12 (from May 24, 2015).
+		- added new PINT plugin for Newton 3.14 (trunk from Jan 3, 2017).
+	- Havok:
+		- better tracking of memory usage.
+		- started to share code between all Havok plugins.
+		- exposed more parameters to UI.
+		- initial (incomplete) support for "articulations". Currently disabled because it crashes in
+		some scenes.
+		- support for cylinders has been added.
+		- support for kinematics has been enabled in old versions of Havok.
+		- free versions of Havok are not available anymore (see https://www.havok.com/pcxs_redirect/) so
+		I will not be able to add and test newer versions in PEEL.
+	- PhysX 3.x:
+		- the UI has been unified for all 3.x PINT plugins except 3.1.
+		- new parameters have been exposed to the UI.
+		- default contact offset value has been increased (decreasing performance here and there but
+		otherwise increasing stability).
+		- max angular velocity has been properly setup to a higher value in all PhysX plugins. The default
+		value in PhysX is quite small, which makes some tests fail and perhaps give the wrong impressions.
+		- added some quick preconfigured settings to tweak PhysX for either performance or accuracy.
+		- the PhysX allocator (on the PINT side) is now thread-safe.
+	- PhysX 3.4:
+		- the PCM regression (in PEEL 1.01) has been fixed.
+		- the overlap/sweep performance regressions (in PEEL 1.01) have been fixed.
+		- the 3.4 architecture has changed significantly since the PEEL 1.01 version, to make the code
+		compatible with GPU rigid bodies.
+
 ---
 
-* april 2015: v1.01 - the Bullet single-triangle-mesh issue
+* 2016: v1.02 - the internal issue.
+
+	Versions 1.02 and more have been used internally for a year while working on PhysX 3.4, but they were
+	never released to the public.
+
+---
+
+* april 2015: v1.01 - the Bullet single-triangle-mesh issue.
 
 	- the Bullet plugin was crashing or behaving oddly in all scenes featuring the "single triangle" mesh.
 	This has been fixed. The reason was that the triangle's data was not persistent (contrary to what happens
@@ -20,7 +110,7 @@ Contact email: pierre.terdiman@gmail.com   <= use this first
 
 ---
 
-* april 2015: v1.0 - first public version
+* april 2015: v1.0 - first public version.
 
 	- PINT_Bullet was my initial Bullet PEEL plugin, for version 2.79. It will be deprecated soon, since it
 	seems old and irrelevant now.

@@ -14,6 +14,8 @@
 #include "Loader_RepX.h"
 #include "Loader_Bin.h"
 #include "Random.h"
+#include "GUI_Helpers.h"
+#include "MyConvex.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -27,7 +29,7 @@
 		virtual	const char*		GetDescription()	const	{ return desc;			}					\
 		virtual	TestCategory	GetCategory()		const	{ return category;		}					\
 		virtual	bool			ProfileUpdate()				{ return true;			}					\
-		virtual	udword			Update(Pint& pint)			{ return DoBatchRaycasts(*this, pint);	}	\
+		virtual	udword			Update(Pint& pint, float dt){ return DoBatchRaycasts(*this, pint);	}	\
 		virtual	bool			Setup(Pint& pint, const PintCaps& caps)									\
 		{																								\
 			if(!caps.mSupportRaycasts)																	\
@@ -40,11 +42,11 @@
 	class SceneRaycastVsShapes : public TestBase
 	{
 		public:
-								SceneRaycastVsShapes()			{ mType = PINT_SHAPE_UNDEFINED;	mTypeData = 4;	mDynamic = false;	}
-		virtual					~SceneRaycastVsShapes()			{																	}
-		virtual	TestCategory	GetCategory()			const	{ return CATEGORY_RAYCAST;											}
-		virtual	bool			ProfileUpdate()					{ return true;														}
-		virtual	udword			Update(Pint& pint)				{ return DoBatchRaycasts(*this, pint);								}
+								SceneRaycastVsShapes()			{ mShapeType = PINT_SHAPE_UNDEFINED;	mConvexIndex = CONVEX_INDEX_4;	mSize = 32;	mDynamic = false;	}
+		virtual					~SceneRaycastVsShapes()			{										}
+		virtual	TestCategory	GetCategory()			const	{ return CATEGORY_RAYCAST;				}
+		virtual	bool			ProfileUpdate()					{ return true;							}
+		virtual	udword			Update(Pint& pint, float dt)	{ return DoBatchRaycasts(*this, pint);	}
 
 		virtual void			GetSceneParams(PINT_WORLD_CREATE& desc)
 		{
@@ -56,7 +58,7 @@
 		virtual bool			CommonSetup()
 		{
 			TestBase::CommonSetup();
-			return GenerateArrayOfVerticalRaycasts(*this, 35.0f, 32, 32, gSQMaxDist);
+			return GenerateArrayOfVerticalRaycasts(*this, float(mSize)+3.0f, mSize, mSize, gSQMaxDist);
 		}
 
 		virtual bool			Setup(Pint& pint, const PintCaps& caps)
@@ -64,99 +66,102 @@
 			if(!caps.mSupportRaycasts)
 				return false;
 
-			const udword NbX = 32;
-			const udword NbY = 32;
+			if(mShapeType==PINT_SHAPE_CYLINDER || mShapeType==PINT_SHAPE_MESH)
+				return false;
+
+			const udword NbX = mSize;
+			const udword NbY = mSize;
 			const float Altitude = 10.0f;
-			const float Scale = 35.0f;
+			const float Scale = float(mSize)+3.0f;
 			const float Mass = mDynamic ? 1.0f : 0.0f;
 
-			return GenerateArrayOfObjects(pint, caps, mType, mTypeData, NbX, NbY, Altitude, Scale, Mass);
+			return GenerateArrayOfObjects(pint, caps, mShapeType, mConvexIndex, NbX, NbY, Altitude, Scale, Mass);
 		}
-
-				PintShape		mType;
-				udword			mTypeData;
+				PintShape		mShapeType;
+				ConvexIndex		mConvexIndex;
+				udword			mSize;
 				bool			mDynamic;
 	};
 
-#define START_SQ_RAYCAST_TEST_VS_SHAPES(name, desc, type, is_dynamic)									\
-	class name : public SceneRaycastVsShapes															\
-	{																									\
-		public:																							\
-								name()						{ mType = type;	mDynamic = is_dynamic;	}	\
-		virtual					~name()						{										}	\
-		virtual	const char*		GetName()			const	{ return #name;							}	\
-		virtual	const char*		GetDescription()	const	{ return desc;							}
+static const char* gDesc_SceneRaycastVsShapes = "(Configurable test) - a grid of raycasts against a grid of shapes. Select undefined shape to create an empty scene and measure the operating overhead of raycasts.";
 
-///////////////////////////////////////////////////////////////////////////////
+class ConfigurableSceneRaycastVsShapes : public SceneRaycastVsShapes
+{
+			IceComboBox*	mComboBox_ConvexIndex;
+			IceComboBox*	mComboBox_ShapeType;
+			IceEditBox*		mEditBox_Size;
+			IceCheckBox*	mCheckBox_Dynamic;
+	public:
+							ConfigurableSceneRaycastVsShapes() :
+								mComboBox_ConvexIndex	(null),
+								mComboBox_ShapeType		(null),
+								mEditBox_Size			(null),
+								mCheckBox_Dynamic		(null)	{}
+	virtual					~ConfigurableSceneRaycastVsShapes()		{							}
+	virtual	const char*		GetName()			const	{ return "SceneRaycastVsShapes";		}
+	virtual	const char*		GetDescription()	const	{ return gDesc_SceneRaycastVsShapes;	}
 
-static const char* gDesc_SceneRaycastOverhead = "Empty scene used to measure the operating overhead of 32*32 raycasts.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastOverhead, gDesc_SceneRaycastOverhead, PINT_SHAPE_UNDEFINED, false)
-END_TEST(SceneRaycastOverhead)
+	virtual	void			InitUI(PintGUIHelper& helper)
+	{
+		WindowDesc WD;
+		WD.mParent	= null;
+		WD.mX		= 50;
+		WD.mY		= 50;
+		WD.mWidth	= 300;
+		WD.mHeight	= 200;
+		WD.mLabel	= "SceneRaycastVsShapes";
+		WD.mType	= WINDOW_DIALOG;
+		IceWindow* UI = ICE_NEW(IceWindow)(WD);
+		RegisterUIElement(UI);
+		UI->SetVisible(true);
 
-///////////////////////////////////////////////////////////////////////////////
+		Container* UIElems = GetUIElements();
 
-static const char* gDesc_SceneRaycastVsStaticSpheres = "32*32 raycasts against 32*32 static spheres.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastVsStaticSpheres, gDesc_SceneRaycastVsStaticSpheres, PINT_SHAPE_SPHERE, false)
-END_TEST(SceneRaycastVsStaticSpheres)
+		const sdword EditBoxWidth = 60;
+		const sdword LabelWidth = 100;
+		const sdword OffsetX = LabelWidth + 10;
+		const sdword LabelOffsetY = 2;
+		const sdword YStep = 20;
+		sdword y = 0;
+		{
+			mCheckBox_Dynamic = helper.CreateCheckBox(UI, 0, 4, y, 400, 20, "Dynamic shapes", UIElems, false, null, null);
+			y += YStep;
 
-static const char* gDesc_SceneRaycastVsDynamicSpheres = "32*32 raycasts against 32*32 dynamic spheres.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastVsDynamicSpheres, gDesc_SceneRaycastVsDynamicSpheres, PINT_SHAPE_SPHERE, true)
-END_TEST(SceneRaycastVsDynamicSpheres)
+			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "Grid size:", UIElems);
+			mEditBox_Size = helper.CreateEditBox(UI, 1, 4+OffsetX, y, EditBoxWidth, 20, "32", UIElems, EDITBOX_INTEGER_POSITIVE, null, null);
+			y += YStep;
 
-///////////////////////////////////////////////////////////////////////////////
+			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "Shape:", UIElems);
+			mComboBox_ShapeType = CreateShapeTypeComboBox(UI, 4+OffsetX, y, true, SSM_UNDEFINED|SSM_SPHERE|SSM_CAPSULE|SSM_BOX|SSM_CONVEX);
+			RegisterUIElement(mComboBox_ShapeType);
+			y += YStep;
 
-static const char* gDesc_SceneRaycastVsStaticCapsules = "32*32 raycasts against 32*32 static capsules.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastVsStaticCapsules, gDesc_SceneRaycastVsStaticCapsules, PINT_SHAPE_CAPSULE, false)
-END_TEST(SceneRaycastVsStaticCapsules)
+			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "Convex:", UIElems);
+			mComboBox_ConvexIndex = CreateConvexObjectComboBox(UI, 4+OffsetX, y, true);
+			RegisterUIElement(mComboBox_ConvexIndex);
+			y += YStep;
+		}
 
-static const char* gDesc_SceneRaycastVsDynamicCapsules = "32*32 raycasts against 32*32 dynamic capsules.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastVsDynamicCapsules, gDesc_SceneRaycastVsDynamicCapsules, PINT_SHAPE_CAPSULE, true)
-END_TEST(SceneRaycastVsDynamicCapsules)
+		y += YStep;
+		AddResetButton(UI, 4, y, 300-16);
+	}
 
-///////////////////////////////////////////////////////////////////////////////
-
-static const char* gDesc_SceneRaycastVsStaticBoxes = "32*32 raycasts against 32*32 static boxes.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastVsStaticBoxes, gDesc_SceneRaycastVsStaticBoxes, PINT_SHAPE_BOX, false)
-END_TEST(SceneRaycastVsStaticBoxes)
-
-static const char* gDesc_SceneRaycastVsDynamicBoxes = "32*32 raycasts against 32*32 dynamic boxes.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastVsDynamicBoxes, gDesc_SceneRaycastVsDynamicBoxes, PINT_SHAPE_BOX, true)
-END_TEST(SceneRaycastVsDynamicBoxes)
-
-///////////////////////////////////////////////////////////////////////////////
-
-static const char* gDesc_SceneRaycastVsBigStaticConvexes = "32*32 raycasts against 32*32 (big) static convexes.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastVsBigStaticConvexes, gDesc_SceneRaycastVsBigStaticConvexes, PINT_SHAPE_CONVEX, false)
-END_TEST(SceneRaycastVsBigStaticConvexes)
-
-static const char* gDesc_SceneRaycastVsBigDynamicConvexes = "32*32 raycasts against 32*32 (big) dynamic convexes.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastVsBigDynamicConvexes, gDesc_SceneRaycastVsBigDynamicConvexes, PINT_SHAPE_CONVEX, true)
 	virtual bool	CommonSetup()
 	{
-		mTypeData = 1;
+		mDynamic = mCheckBox_Dynamic ? mCheckBox_Dynamic->IsChecked() : false;
+
+		mSize = GetFromEditBox(mSize, mEditBox_Size);
+
+		if(mComboBox_ShapeType)
+			mShapeType = PintShape(mComboBox_ShapeType->GetSelectedIndex());
+
+		if(mComboBox_ConvexIndex)
+			mConvexIndex = ConvexIndex(mComboBox_ConvexIndex->GetSelectedIndex());
+
 		return SceneRaycastVsShapes::CommonSetup();
 	}
-END_TEST(SceneRaycastVsBigDynamicConvexes)
 
-///////////////////////////////////////////////////////////////////////////////
-
-static const char* gDesc_SceneRaycastVsSmallStaticConvexes = "32*32 raycasts against 32*32 (small) static convexes.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastVsSmallStaticConvexes, gDesc_SceneRaycastVsSmallStaticConvexes, PINT_SHAPE_CONVEX, false)
-	virtual bool	CommonSetup()
-	{
-		mTypeData = 2;
-		return SceneRaycastVsShapes::CommonSetup();
-	}
-END_TEST(SceneRaycastVsSmallStaticConvexes)
-
-static const char* gDesc_SceneRaycastVsSmallDynamicConvexes = "32*32 raycasts against 32*32 (small) dynamic convexes.";
-START_SQ_RAYCAST_TEST_VS_SHAPES(SceneRaycastVsSmallDynamicConvexes, gDesc_SceneRaycastVsSmallDynamicConvexes, PINT_SHAPE_CONVEX, true)
-	virtual bool	CommonSetup()
-	{
-		mTypeData = 2;
-		return SceneRaycastVsShapes::CommonSetup();
-	}
-END_TEST(SceneRaycastVsSmallDynamicConvexes)
+}ConfigurableSceneRaycastVsShapes;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -164,13 +169,13 @@ static const char* gDesc_PotPourri_StaticRaycasts = "4096 random raycasts agains
 
 START_SQ_RAYCAST_TEST(PotPourri_StaticRaycasts, CATEGORY_RAYCAST, gDesc_PotPourri_StaticRaycasts)
 
-	virtual bool PotPourri_StaticRaycasts::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		return Setup_PotPourri_Raycasts(*this, 4096, 100.0f);
 	}
 
-	virtual bool PotPourri_StaticRaycasts::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		return Setup_PotPourri_Raycasts(pint, caps, 0.0f, 16, 16, 16);
 	}
@@ -181,13 +186,13 @@ static const char* gDesc_PotPourri_StaticRaycasts2 = "20000 random raycasts agai
 
 START_SQ_RAYCAST_TEST(PotPourri_StaticRaycasts2, CATEGORY_RAYCAST, gDesc_PotPourri_StaticRaycasts2)
 
-	virtual bool PotPourri_StaticRaycasts2::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		return Setup_PotPourri_Raycasts(*this, 20000, 100.0f);
 	}
 
-	virtual bool PotPourri_StaticRaycasts2::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		return Setup_PotPourri_Raycasts(pint, caps, 0.0f, 16, 16, 16);
 	}
@@ -198,13 +203,13 @@ static const char* gDesc_PotPourri_DynamicRaycasts = "4096 random raycasts again
 
 START_SQ_RAYCAST_TEST(PotPourri_DynamicRaycasts, CATEGORY_RAYCAST, gDesc_PotPourri_DynamicRaycasts)
 
-	virtual bool PotPourri_DynamicRaycasts::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		return Setup_PotPourri_Raycasts(*this, 4096, 1.0f);
 	}
 
-	virtual bool PotPourri_DynamicRaycasts::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		return Setup_PotPourri_Raycasts(pint, caps, 1.0f, 16, 16, 16);
 	}
@@ -215,13 +220,13 @@ static const char* gDesc_PotPourri_DynamicRaycasts2 = "20000 random raycasts aga
 
 START_SQ_RAYCAST_TEST(PotPourri_DynamicRaycasts2, CATEGORY_RAYCAST, gDesc_PotPourri_DynamicRaycasts2)
 
-	virtual bool PotPourri_DynamicRaycasts2::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		return Setup_PotPourri_Raycasts(*this, 20000, 1.0f);
 	}
 
-	virtual bool PotPourri_DynamicRaycasts2::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		return Setup_PotPourri_Raycasts(pint, caps, 1.0f, 16, 16, 16);
 	}
@@ -268,13 +273,13 @@ START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_MeshSurface, CATEGORY_R
 	float		mAlphaStep;
 	float		mPhiStep;
 
-	virtual	void SceneRaycastVsStaticMeshes_MeshSurface::CommonRelease()
+	virtual	void	CommonRelease()
 	{
 		mSurfaceRayOrigins.Empty();
 		TestBase::CommonRelease();
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_MeshSurface::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -307,13 +312,12 @@ START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_MeshSurface, CATEGORY_R
 				}
 			}
 		}
-
 		return true;
 	}
 
-	virtual void SceneRaycastVsStaticMeshes_MeshSurface::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
-		TestBase::CommonUpdate();
+		TestBase::CommonUpdate(dt);
 
 		mAlpha += mAlphaStep;
 		if (mAlpha > PI*2)
@@ -341,7 +345,13 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_TestZone_ShortRays = "TestZo
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TestZone_ShortRays, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TestZone_ShortRays)
 
-	virtual bool SceneRaycastVsStaticMeshes_TestZone_ShortRays::CommonSetup()
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
+	{
+		TestBase::GetSceneParams(desc);
+		desc.mCamera[0] = CameraPose(Point(50.00f, 50.00f, 50.00f), Point(-0.43f, -0.58f, -0.69f));
+	}
+
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -375,7 +385,13 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_TestZone_LongRays = "TestZon
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TestZone_LongRays, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TestZone_LongRays)
 
-	virtual bool SceneRaycastVsStaticMeshes_TestZone_LongRays::CommonSetup()
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
+	{
+		TestBase::GetSceneParams(desc);
+		desc.mCamera[0] = CameraPose(Point(50.00f, 50.00f, 50.00f), Point(-0.43f, -0.58f, -0.69f));
+	}
+
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -411,7 +427,13 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_TestZone_VerticalRays = "Tes
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TestZone_VerticalRays, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TestZone_VerticalRays)
 
-	virtual bool SceneRaycastVsStaticMeshes_TestZone_VerticalRays::CommonSetup()
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
+	{
+		TestBase::GetSceneParams(desc);
+		desc.mCamera[0] = CameraPose(Point(50.00f, 50.00f, 50.00f), Point(-0.43f, -0.58f, -0.69f));
+	}
+
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -445,7 +467,7 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_Archipelago1024 = "32*32 ray
 
 START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_Archipelago1024, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_Archipelago1024)
 
-	virtual bool SceneRaycastVsStaticMeshes_Archipelago1024::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -455,7 +477,7 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_Archipelago1024, CATEGORY_RAYCA
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_Archipelago1024::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportRaycasts)
 			return false;
@@ -486,7 +508,7 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_Archipelago16384 = "128*128 
 
 START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_Archipelago16384, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_Archipelago16384)
 
-	virtual bool SceneRaycastVsStaticMeshes_Archipelago16384::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -496,7 +518,7 @@ START_SQ_RAYCAST_TEST(SceneRaycastVsStaticMeshes_Archipelago16384, CATEGORY_RAYC
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_Archipelago16384::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportRaycasts)
 			return false;
@@ -525,7 +547,7 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_KP1024 = "1024 raycasts agai
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP1024, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP1024)
 
-	virtual bool SceneRaycastVsStaticMeshes_KP1024::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -554,7 +576,7 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_KP16384 = "16384 raycasts ag
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP16384, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP16384)
 
-	virtual bool SceneRaycastVsStaticMeshes_KP16384::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -583,7 +605,7 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_KP16384_2 = "16384 raycasts 
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP16384_2, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP16384_2)
 
-	virtual bool SceneRaycastVsStaticMeshes_KP16384_2::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -612,7 +634,7 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_KP16384_NoHit = "16384 very 
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP16384_NoHit, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP16384_NoHit)
 
-	virtual bool SceneRaycastVsStaticMeshes_KP16384_NoHit::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -643,7 +665,7 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_KP_Single = "Single long ray
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP_Single, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP_Single)
 
-	virtual bool SceneRaycastVsStaticMeshes_KP_Single::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -675,7 +697,7 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_KP2_Long = "2048 long raycas
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP2_Long, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP2_Long)
 
-	virtual bool SceneRaycastVsStaticMeshes_KP2_Long::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -707,7 +729,7 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_KP2_Short = "2048 short rayc
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_KP2_Short, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP2_Short)
 
-	virtual bool SceneRaycastVsStaticMeshes_KP2_Short::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -758,7 +780,7 @@ static const char* gDesc_SceneRaycastVsStaticMeshes_KP_Phantom = "2048 short ray
 
 START_SQ_TEST(SceneRaycastVsStaticMeshes_KP_Phantom, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_KP_Phantom)
 
-	virtual bool SceneRaycastVsStaticMeshes_KP_Phantom::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -768,7 +790,7 @@ START_SQ_TEST(SceneRaycastVsStaticMeshes_KP_Phantom, CATEGORY_RAYCAST, gDesc_Sce
 		return true;
 	}
 
-	virtual bool SceneRaycastVsStaticMeshes_KP_Phantom::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportRaycasts)
 			return false;
@@ -836,7 +858,7 @@ START_SQ_TEST(SceneRaycastVsStaticMeshes_KP_Phantom, CATEGORY_RAYCAST, gDesc_Sce
 		return true;
 	}
 
-	virtual udword SceneRaycastVsStaticMeshes_KP_Phantom::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		PintCaps Caps;
 		pint.GetCaps(Caps);
@@ -907,18 +929,18 @@ void SceneRaycastVsStaticMeshes_KP2_Phantom::CommonUpdate()
 {
 }
 
-udword SceneRaycastVsStaticMeshes_KP2_Phantom::Update(Pint& pint)
+udword SceneRaycastVsStaticMeshes_KP2_Phantom::Update(Pint& pint, float dt)
 {
 	return DoBatchRaycasts(*this, pint, 0.2f, true);
 }*/
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_SceneRaycastVsStaticMeshes_Terrain_Long = "128*128 long raycasts against the tesselated terrain.";
+static const char* gDesc_SceneRaycastVsStaticMeshes_Terrain_Long = "128*128 long raycasts against the tessellated terrain.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_Terrain_Long, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_Terrain_Long)
 
-	virtual bool SceneRaycastVsStaticMeshes_Terrain_Long::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -947,11 +969,11 @@ END_TEST(SceneRaycastVsStaticMeshes_Terrain_Long)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_SceneRaycastVsStaticMeshes_Terrain_Short = "32*32 short raycasts against the tesselated terrain.";
+static const char* gDesc_SceneRaycastVsStaticMeshes_Terrain_Short = "32*32 short raycasts against the tessellated terrain.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_Terrain_Short, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_Terrain_Short)
 
-	virtual bool SceneRaycastVsStaticMeshes_Terrain_Short::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1002,7 +1024,7 @@ START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TessBunny_NodeSorting, 
 	udword	mNbFrames;
 	udword	mIndex;
 
-	virtual bool SceneRaycastVsStaticMeshes_TessBunny_NodeSorting::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		mNbFrames = 0;
 		mIndex = 0;
@@ -1020,9 +1042,9 @@ START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TessBunny_NodeSorting, 
 		return true;
 	}
 
-	virtual void SceneRaycastVsStaticMeshes_TessBunny_NodeSorting::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
-		TestBase::CommonUpdate();
+		TestBase::CommonUpdate(dt);
 		if(mNbFrames==0)
 		{
 			const udword Index = mIndex;
@@ -1073,11 +1095,11 @@ END_TEST(SceneRaycastVsStaticMeshes_TessBunny_NodeSorting)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_SceneRaycastVsStaticMeshes_TessBunny16384 = "16384 radial raycasts against the tesselated bunny.";
+static const char* gDesc_SceneRaycastVsStaticMeshes_TessBunny16384 = "16384 radial raycasts against the tessellated bunny.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TessBunny16384, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunny16384)
 
-	virtual bool SceneRaycastVsStaticMeshes_TessBunny16384::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1107,12 +1129,12 @@ END_TEST(SceneRaycastVsStaticMeshes_TessBunny16384)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_SceneRaycastVsStaticMeshes_TessBunny16384_2 = "16384 radial raycasts against the tesselated bunny. Same as before but with a larger ray length. In theory the \
+static const char* gDesc_SceneRaycastVsStaticMeshes_TessBunny16384_2 = "16384 radial raycasts against the tessellated bunny. Same as before but with a larger ray length. In theory the \
 ray length should not have an impact on performance. In practice however, some engines become much slower when the ray becomes larger.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TessBunny16384_2, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunny16384_2)
 
-	virtual bool SceneRaycastVsStaticMeshes_TessBunny16384_2::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1142,12 +1164,18 @@ END_TEST(SceneRaycastVsStaticMeshes_TessBunny16384_2)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_SceneRaycastVsStaticMeshes_TessBunnyShort = "Short raycasts against the tesselated bunny. There is one raycast per triangle. \
+static const char* gDesc_SceneRaycastVsStaticMeshes_TessBunnyShort = "Short raycasts against the tessellated bunny. There is one raycast per triangle. \
 Each ray starts a little bit above the triangle. Ray direction is the opposite of the triangle normal.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(SceneRaycastVsStaticMeshes_TessBunnyShort, CATEGORY_RAYCAST, gDesc_SceneRaycastVsStaticMeshes_TessBunnyShort)
 
-	virtual bool SceneRaycastVsStaticMeshes_TessBunnyShort::CommonSetup()
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
+	{
+		TestBase::GetSceneParams(desc);
+		desc.mCamera[0] = CameraPose(Point(19.98f, 16.48f, -0.94f), Point(-0.93f, -0.36f, 0.05f));
+	}
+
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1180,7 +1208,7 @@ static const char* gDesc_KP_RT = "Konoko Payne mesh level. Raytracing test.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(KP_RT, CATEGORY_RAYCAST, gDesc_KP_RT)
 
-	virtual bool KP_RT::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadRaysFile(*this, "default_peel_view_rays.bin", true, true);
@@ -1198,7 +1226,7 @@ static const char* gDesc_Bunny_RT = "Bunny. Raytracing test.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(Bunny_RT, CATEGORY_RAYCAST, gDesc_Bunny_RT)
 
-	virtual bool Bunny_RT::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadRaysFile(*this, "bunny_rays.bin", true, true);
@@ -1216,7 +1244,7 @@ static const char* gDesc_Terrain_RT = "Terrain tiles. Raytracing test.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(Terrain_RT, CATEGORY_RAYCAST, gDesc_Terrain_RT)
 
-	virtual bool Terrain_RT::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadRaysFile(*this, "default_peel_view_rays.bin", true, true);
@@ -1233,7 +1261,7 @@ static const char* gDesc_TestZone_RT = "TestZone (tess). Raytracing test.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(TestZone_RT, CATEGORY_RAYCAST, gDesc_TestZone_RT)
 
-	virtual bool TestZone_RT::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadRaysFile(*this, "testzone_rays_5.bin", true, true);
@@ -1251,7 +1279,7 @@ static const char* gDesc_TestZone_RT2 = "TestZone (tess). Raytracing test 2.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(TestZone_RT2, CATEGORY_RAYCAST, gDesc_TestZone_RT2)
 
-	virtual bool TestZone_RT2::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadRaysFile(*this, "testzone_rays_4.bin", true, true);
@@ -1269,7 +1297,7 @@ static const char* gDesc_TestZone_RT3 = "TestZone. Raytracing ride test.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(TestZone_RT3, CATEGORY_RAYCAST, gDesc_TestZone_RT3)
 
-	virtual bool TestZone_RT3::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1286,7 +1314,7 @@ START_SQ_RAYCAST_TEST_VS_MESH(TestZone_RT3, CATEGORY_RAYCAST, gDesc_TestZone_RT3
 		return true;
 	}
 
-	virtual void TestZone_RT3::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
 		mCameraManager.UpdateCameraPose();
 		mCameraManager.GenerateRays(GetRegisteredRaycasts(), 128, 1000.0f);
@@ -1300,7 +1328,7 @@ static const char* gDesc_Terrain_RT2 = "Terrain. Raytracing ride test.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(Terrain_RT2, CATEGORY_RAYCAST, gDesc_Terrain_RT2)
 
-	virtual bool Terrain_RT2::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1315,7 +1343,7 @@ START_SQ_RAYCAST_TEST_VS_MESH(Terrain_RT2, CATEGORY_RAYCAST, gDesc_Terrain_RT2)
 		return true;
 	}
 
-	virtual void Terrain_RT2::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
 		mCameraManager.UpdateCameraPose();
 		mCameraManager.GenerateRays(GetRegisteredRaycasts(), 128, 10000.0f);
@@ -1329,7 +1357,7 @@ static const char* gDesc_KP_RT2 = "KP. Raytracing ride test.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(KP_RT2, CATEGORY_RAYCAST, gDesc_KP_RT2)
 
-	virtual bool KP_RT2::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1344,7 +1372,7 @@ START_SQ_RAYCAST_TEST_VS_MESH(KP_RT2, CATEGORY_RAYCAST, gDesc_KP_RT2)
 		return true;
 	}
 
-	virtual void KP_RT2::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
 		mCameraManager.UpdateCameraPose();
 		mCameraManager.GenerateRays(GetRegisteredRaycasts(), 128, 10000.0f);
@@ -1358,7 +1386,7 @@ static const char* gDesc_InsideRays_TestZone = "TestZone. Inside rays.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(InsideRays_TestZone, CATEGORY_RAYCAST, gDesc_InsideRays_TestZone)
 
-	virtual bool InsideRays_TestZone::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1398,7 +1426,7 @@ static const char* gDesc_OutsideRays_TestZone = "TestZone. Outside rays.";
 
 START_SQ_RAYCAST_TEST_VS_MESH(OutsideRays_TestZone, CATEGORY_RAYCAST, gDesc_OutsideRays_TestZone)
 
-	virtual bool OutsideRays_TestZone::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1434,12 +1462,12 @@ static const char* gDesc_SpecularBulletRays = "Specular level. Bullet rays.";
 
 START_SQ_RAYCAST_TEST(SpecularBulletRays, CATEGORY_RAYCAST, gDesc_SpecularBulletRays)
 
-	virtual bool SpecularBulletRays::IsPrivate()	const
+	virtual bool	IsPrivate()	const
 	{
 		return true;
 	}
 
-	virtual bool SpecularBulletRays::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 //		mRepX = CreateRepXContext("specular_raycast_meshes.repx", 1.0f, false);
@@ -1464,7 +1492,7 @@ START_SQ_RAYCAST_TEST(SpecularBulletRays, CATEGORY_RAYCAST, gDesc_SpecularBullet
 		return true;
 	}
 
-	virtual bool SpecularBulletRays::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportRaycasts || !caps.mSupportMeshes)
 			return false;
@@ -1475,70 +1503,107 @@ END_TEST(SpecularBulletRays)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define IMPLEMENT_VALVE_RAYCAST_TEST(name, desc, filename)					\
-START_SQ_RAYCAST_TEST(name, CATEGORY_RAYCAST, desc)							\
-																			\
-	virtual bool name::IsPrivate()	const									\
-	{																		\
-		return true;														\
-	}																		\
-																			\
-	virtual bool name::CommonSetup()										\
-	{																		\
-		TestBase::CommonSetup();											\
-		LoadRaysFile(*this, filename, true);								\
-		mRepX = CreateRepXContext("c5m4_quarter2_Statics.repx", gValveScale, true);	\
-		mCreateDefaultEnvironment = false;									\
-		return true;														\
-	}																		\
-																			\
-	virtual bool name::Setup(Pint& pint, const PintCaps& caps)				\
-	{																		\
-		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)					\
-			return false;													\
-		return AddToPint(pint, mRepX);										\
-	}																		\
-																			\
-END_TEST(name)
+static const char* gDesc_ValveRaycasts = "(Configurable test) - Valve raycasts.";
+class ValveRaycasts : public TestBase
+{
+			IceComboBox*	mComboBox_SceneIndex;
+	public:
+							ValveRaycasts() : mComboBox_SceneIndex(null)			{			}
+	virtual					~ValveRaycasts()			{										}
+	virtual	const char*		GetName()			const	{ return "ValveRaycasts";				}
+	virtual	const char*		GetDescription()	const	{ return gDesc_ValveRaycasts;			}
+	virtual	TestCategory	GetCategory()		const	{ return CATEGORY_RAYCAST;				}
+	virtual	bool			ProfileUpdate()				{ return true;							}
+	virtual bool			IsPrivate()			const	{ return true;							}
+	virtual	udword			Update(Pint& pint, float dt){ return DoBatchRaycasts(*this, pint);	}
 
-#define IMPLEMENT_VALVE_RAYCAST_TEST_OLD(name, desc, filename)				\
-START_SQ_RAYCAST_TEST_VS_MESH(name, CATEGORY_RAYCAST, desc)					\
-																			\
-	virtual bool name::IsPrivate()	const									\
-	{																		\
-		return true;														\
-	}																		\
-																			\
-	virtual bool name::CommonSetup()										\
-	{																		\
-		TestBase::CommonSetup();											\
-		LoadRaysFile(*this, filename, true);								\
-		LoadRepXFile_Obsolete(*this, "c5m4_quarter2_Statics.repx", gValveScale, true);\
-		mCreateDefaultEnvironment = false;									\
-		return true;														\
-	}																		\
-																			\
-END_TEST(name)
+	virtual	void			InitUI(PintGUIHelper& helper)
+	{
+		WindowDesc WD;
+		WD.mParent	= null;
+		WD.mX		= 50;
+		WD.mY		= 50;
+		WD.mWidth	= 300;
+		WD.mHeight	= 120;
+		WD.mLabel	= "ValveRaycasts";
+		WD.mType	= WINDOW_DIALOG;
+		IceWindow* UI = ICE_NEW(IceWindow)(WD);
+		RegisterUIElement(UI);
+		UI->SetVisible(true);
 
-static const char* gDesc_ValveRaycastsOnlyRays = "Valve level, raycasts 'only rays'.";
-IMPLEMENT_VALVE_RAYCAST_TEST(ValveRaycastsOnlyRays, gDesc_ValveRaycastsOnlyRays, "rays(only rays).bin")
-IMPLEMENT_VALVE_RAYCAST_TEST_OLD(ValveRaycastsOnlyRays_Old, gDesc_ValveRaycastsOnlyRays, "rays(only rays).bin")
+		Container* UIElems = GetUIElements();
 
-static const char* gDesc_ValveRaycastsMidGame1 = "Valve level, raycasts 'MidGame1'.";
-IMPLEMENT_VALVE_RAYCAST_TEST(ValveRaycastsMidGame1, gDesc_ValveRaycastsMidGame1, "l4d2_rays(midgame1).bin")
-IMPLEMENT_VALVE_RAYCAST_TEST_OLD(ValveRaycastsMidGame1_Old, gDesc_ValveRaycastsMidGame1, "l4d2_rays(midgame1).bin")
+		const sdword OffsetX = 70;
+		const sdword EditBoxWidth = 60;
+		const sdword LabelWidth = 30;
+		const sdword LabelOffsetY = 2;
+		const sdword YStep = 20;
+		sdword y = 0;
+		{
+			y += YStep;
+			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "File", UIElems);
+			{
+				ComboBoxDesc CBBD;
+				CBBD.mID		= 0;
+				CBBD.mParent	= UI;
+				CBBD.mX			= 4+OffsetX;
+				CBBD.mY			= y;
+				CBBD.mWidth		= 200;
+				CBBD.mHeight	= 20;
+				CBBD.mLabel		= "Scene index";
+				IceComboBox* CB = ICE_NEW(IceComboBox)(CBBD);
+				CB->Add("Valve level, raycasts 'only rays'.");
+				CB->Add("Valve level, raycasts 'MidGame1'.");
+				CB->Add("Valve level, raycasts 'MidGame2'.");
+				CB->Add("Valve level, raycasts 'MidGame3'.");
+				CB->Add("Valve level, raycasts 'MidGame4'.");
+				CB->Select(0);
+				CB->SetVisible(true);
+				RegisterUIElement(CB);
+				mComboBox_SceneIndex = CB;
+			}
+			y += YStep;
+		}
 
-static const char* gDesc_ValveRaycastsMidGame2 = "Valve level, raycasts 'MidGame2'.";
-IMPLEMENT_VALVE_RAYCAST_TEST(ValveRaycastsMidGame2, gDesc_ValveRaycastsMidGame2, "l4d2_rays(midgame2).bin")
-IMPLEMENT_VALVE_RAYCAST_TEST_OLD(ValveRaycastsMidGame2_Old, gDesc_ValveRaycastsMidGame2, "l4d2_rays(midgame2).bin")
+		y += YStep;
+		AddResetButton(UI, 4, y, 300-16);
+	}
 
-static const char* gDesc_ValveRaycastsMidGame3 = "Valve level, raycasts 'MidGame3'.";
-IMPLEMENT_VALVE_RAYCAST_TEST(ValveRaycastsMidGame3, gDesc_ValveRaycastsMidGame3, "l4d2_rays(midgame3).bin")
-IMPLEMENT_VALVE_RAYCAST_TEST_OLD(ValveRaycastsMidGame3_Old, gDesc_ValveRaycastsMidGame3, "l4d2_rays(midgame3).bin")
+	virtual bool			CommonSetup()
+	{
+		TestBase::CommonSetup();
 
-static const char* gDesc_ValveRaycastsMidGame4 = "Valve level, raycasts 'MidGame4'.";
-IMPLEMENT_VALVE_RAYCAST_TEST(ValveRaycastsMidGame4, gDesc_ValveRaycastsMidGame4, "l4d2_rays(midgame4).bin")
-IMPLEMENT_VALVE_RAYCAST_TEST_OLD(ValveRaycastsMidGame4_Old, gDesc_ValveRaycastsMidGame4, "l4d2_rays(midgame4).bin")
+		udword Index = 0;
+		if(mComboBox_SceneIndex)
+			Index = udword(mComboBox_SceneIndex->GetSelectedIndex());
+
+		const char* Filename = null;
+		if(Index==0)
+			Filename = "rays(only rays).bin";
+		else if(Index==1)
+			Filename = "l4d2_rays(midgame1).bin";
+		else if(Index==2)
+			Filename = "l4d2_rays(midgame2).bin";
+		else if(Index==3)
+			Filename = "l4d2_rays(midgame3).bin";
+		else if(Index==4)
+			Filename = "l4d2_rays(midgame4).bin";
+
+		LoadRaysFile(*this, Filename, true);
+		mRepX = CreateRepXContext("c5m4_quarter2_Statics.repx", gValveScale, true);
+//		LoadRepXFile_Obsolete(*this, "c5m4_quarter2_Statics.repx", gValveScale, true);
+		mCreateDefaultEnvironment = false;
+		return true;
+	}
+
+	virtual bool			Setup(Pint& pint, const PintCaps& caps)
+	{
+		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
+			return false;
+		return AddToPint(pint, mRepX);
+	}
+
+}ValveRaycasts;
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -1546,12 +1611,12 @@ static const char* gDesc_PlanetsideBulletRays = "512*4 bullet rays against the P
 
 START_SQ_RAYCAST_TEST(PlanetsideBulletRays, CATEGORY_RAYCAST, gDesc_PlanetsideBulletRays)
 
-	virtual bool PlanetsideBulletRays::IsPrivate()	const
+	virtual bool	IsPrivate()	const
 	{
 		return true;
 	}
 
-	virtual void PlanetsideBulletRays::GetSceneParams(PINT_WORLD_CREATE& desc)
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
 	{
 		TestBase::GetSceneParams(desc);
 		desc.mCamera[0] = CameraPose(Point(157.59f, 21.66f, 770.35f), Point(0.66f, -0.54f, 0.52f));
@@ -1578,7 +1643,7 @@ START_SQ_RAYCAST_TEST(PlanetsideBulletRays, CATEGORY_RAYCAST, gDesc_PlanetsideBu
 		}
 	}
 
-	virtual bool PlanetsideBulletRays::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		mRepX = CreateRepXContext("Planetside_Statics.repx", 1.0f, false);
@@ -1586,16 +1651,16 @@ START_SQ_RAYCAST_TEST(PlanetsideBulletRays, CATEGORY_RAYCAST, gDesc_PlanetsideBu
 		return true;
 	}
 
-	virtual bool PlanetsideBulletRays::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportMeshes || !caps.mSupportRaycasts)
 			return false;
 		return AddToPint(pint, mRepX);
 	}
 
-/*	virtual void PlanetsideBulletRays::CommonUpdate()
+/*	virtual void	CommonUpdate(float dt)
 	{
-		TestBase::CommonUpdate();
+		TestBase::CommonUpdate(dt);
 		udword Nb = GetNbRegisteredRaycasts();
 		PintRaycastData* Data = GetRegisteredRaycasts();
 		while(Nb--)
@@ -1615,7 +1680,7 @@ static const char* gDesc_BlackRays = "Black rays (debug).";
 
 START_SQ_RAYCAST_TEST_VS_MESH(BlackRays, CATEGORY_RAYCAST, gDesc_BlackRays)
 
-	virtual bool BlackRays::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadRaysFile(*this, "black_rays.bin", true, true);

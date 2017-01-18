@@ -54,7 +54,8 @@
 				void			SetReadOnly(bool flag);
 
 				void			GetText(char* pOut, int len)	const;
-				void			SetText(const char* pText);
+				void			SetText(const char* text);
+				void			SetMultilineText(const char* text);
 
 				bool			GetTextAsFloat(float& value)	const;
 				bool			GetTextAsInt(sdword& value)		const;

@@ -9,13 +9,13 @@
 #ifndef LOADER_BIN_H
 #define LOADER_BIN_H
 
-	enum TesselationScheme
+	enum TessellationScheme
 	{
 		TESS_BUTTERFLY,
 		TESS_POLYHEDRAL,
 	};
 
 	class SurfaceManager;
-	void LoadMeshesFromFile_(SurfaceManager& test, const char* filename, const float* scale=null, bool mergeMeshes=false, udword tesselation=0, TesselationScheme ts = TESS_BUTTERFLY);
+	void LoadMeshesFromFile_(SurfaceManager& test, const char* filename, const float* scale=null, bool mergeMeshes=false, udword tessellation=0, TessellationScheme ts = TESS_BUTTERFLY);
 
 #endif

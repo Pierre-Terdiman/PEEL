@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="Windows-1252"?>
 <VisualStudioProject
 	ProjectType="Visual C++"
-	Version="9,00"
+	Version="9.00"
 	Name="PEEL"
 	ProjectGUID="{48F3F88D-E628-4E2E-9F22-C4D5CF8A046D}"
 	RootNamespace="PhysicsTest"
@@ -752,6 +752,14 @@
 					Name="GUI"
 					>
 					<File
+						RelativePath=".\GUI_Helpers.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\GUI_Helpers.h"
+						>
+					</File>
+					<File
 						RelativePath=".\ProgressBar.cpp"
 						>
 					</File>
@@ -789,6 +797,18 @@
 					</File>
 					<File
 						RelativePath=".\Camera.h"
+						>
+					</File>
+					<File
+						RelativePath=".\ConvexHull2D.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\Cylinder.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\Cylinder.h"
 						>
 					</File>
 					<File
@@ -836,6 +856,14 @@
 						>
 					</File>
 					<File
+						RelativePath=".\ProceduralTrack.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\ProceduralTrack.h"
+						>
+					</File>
+					<File
 						RelativePath=".\QPCTime.cpp"
 						>
 					</File>
@@ -868,6 +896,10 @@
 						>
 					</File>
 					<File
+						RelativePath=".\TestScenes_Articulations.cpp"
+						>
+					</File>
+					<File
 						RelativePath=".\TestScenes_Behavior.cpp"
 						>
 					</File>
@@ -880,7 +912,15 @@
 						>
 					</File>
 					<File
-						RelativePath=".\TestScenes_Overlap.cpp"
+						RelativePath=".\TestScenes_Cylinders.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\TestScenes_Joints.cpp"
+						>
+					</File>
+					<File
+						RelativePath=".\TestScenes_Kinematics.cpp"
 						>
 					</File>
 					<File
@@ -888,15 +928,11 @@
 						>
 					</File>
 					<File
-						RelativePath=".\TestScenes_Raycast.cpp"
-						>
-					</File>
-					<File
 						RelativePath=".\TestScenes_StaticScene.cpp"
 						>
 					</File>
 					<File
-						RelativePath=".\TestScenes_Sweep.cpp"
+						RelativePath=".\TestScenes_Vehicles.cpp"
 						>
 					</File>
 					<File
@@ -907,9 +943,41 @@
 						RelativePath=".\TestScenesHelpers.h"
 						>
 					</File>
+					<Filter
+						Name="Scene queries"
+						>
+						<File
+							RelativePath=".\TestScenes_Overlap.cpp"
+							>
+						</File>
+						<File
+							RelativePath=".\TestScenes_Raycast.cpp"
+							>
+						</File>
+						<File
+							RelativePath=".\TestScenes_Sweep.cpp"
+							>
+						</File>
+					</Filter>
+					<Filter
+						Name="WIP"
+						>
+						<File
+							RelativePath=".\TestScenes_Bulldozer_WIP.cpp"
+							>
+						</File>
+						<File
+							RelativePath=".\TestScenes_Joints_WIP.cpp"
+							>
+						</File>
+					</Filter>
 				</Filter>
 			</Filter>
 		</Filter>
+		<File
+			RelativePath="..\How to build.txt"
+			>
+		</File>
 		<File
 			RelativePath="..\Known issues &amp; TODO.txt"
 			>

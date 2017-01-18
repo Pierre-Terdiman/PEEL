@@ -71,7 +71,7 @@ Havok::~Havok()
 void Havok::GetCaps(PintCaps& caps) const
 {
 	caps.mSupportRigidBodySimulation	= true;
-	caps.mSupportKinematics				= false;
+	caps.mSupportKinematics				= true;
 	caps.mSupportCollisionGroups		= true;
 	caps.mSupportCompounds				= true;
 	caps.mSupportConvexes				= true;
@@ -80,16 +80,12 @@ void Havok::GetCaps(PintCaps& caps) const
 	caps.mSupportHingeJoints			= true;
 	caps.mSupportFixedJoints			= true;
 	caps.mSupportPrismaticJoints		= true;
-	caps.mSupportPhantoms				= false;
 	caps.mSupportRaycasts				= true;
 	caps.mSupportBoxSweeps				= true;
 	caps.mSupportSphereSweeps			= true;
 	caps.mSupportCapsuleSweeps			= true;
 	caps.mSupportConvexSweeps			= true;
 	caps.mSupportSphereOverlaps			= true;
-	caps.mSupportBoxOverlaps			= false;
-	caps.mSupportCapsuleOverlaps		= false;
-	caps.mSupportConvexOverlaps			= false;
 }
 
 // given an unaligned pointer, round it up to align and
@@ -714,7 +710,7 @@ static void DrawLeafShape(PintRender& renderer, const hkpShape* shape, const PR&
 
 Point Havok::GetMainColor()
 {
-	return Point(0.0f, 1.0f, 1.0f);
+	return HAVOK_MAIN_COLOR;
 }
 
 void Havok::Render(PintRender& renderer)
@@ -782,6 +778,14 @@ hkpRigidBody* Havok::CreateObject(const hkpRigidBodyCinfo& info, const PINT_OBJE
 		rigidBody->setMaxLinearVelocity(gMaxLinearVelocity);
 		rigidBody->setLinearVelocity(ToHkVector4(create.mLinearVelocity));
 		rigidBody->setAngularVelocity(ToHkVector4(create.mAngularVelocity));
+
+		if(create.mCOMLocalOffset.IsNonZero())
+		{
+			hkVector4 LocalCOM = rigidBody->getCenterOfMassLocal();
+			LocalCOM.add4(ToHkVector4(create.mCOMLocalOffset));
+			rigidBody->setCenterOfMassLocal(LocalCOM);
+		}
+
 		rigidBody->unmarkForWrite();
 	}
 
@@ -1162,60 +1166,6 @@ PintObjectHandle Havok::CreateCompoundObject(const PINT_OBJECT_CREATE& desc)
 
 	return CreateObject(info, desc, listShape);
 }
-
-/*
-#include <Common/Internal/ConvexHull/hkGeometryUtility.h>
-hkpRigidBody* CreateRandomConvexGeometricFromBox(const hkVector4& size, const hkReal mass, const hkVector4& position, const int numVertices, BasicRandom& rnd)
-{
-	// generate a random convex geometry
-	hkArray<hkVector4> vertices;
-	{
-		hkVector4 halfExtents; halfExtents.setMul4( 0.5f, size );
-		vertices.reserve( numVertices );
-		for( int i = 0; i < numVertices; i++ )
-		{
-			hkVector4 xyz;
-			{
-				xyz(0) = rnd.randomFloat();
-				xyz(1) = rnd.randomFloat();
-				xyz(2) = rnd.randomFloat();
-				xyz(3) = 0.0f;
-			}
-			xyz.normalize3();
-			xyz(0) *= halfExtents(0);
-			xyz(1) *= halfExtents(1);
-			xyz(2) *= halfExtents(2);
-
-			vertices.pushBack( xyz );
-		}
-	}
-
-	// convert it to a convex vertices shape
-	hkpConvexVerticesShape* cvs = new hkpConvexVerticesShape(vertices);
-	
-	hkpRigidBodyCinfo convexInfo;
-
-	convexInfo.m_shape = cvs;
-	if(mass != 0.0f)
-	{
-		convexInfo.m_mass = mass;
-		hkpInertiaTensorComputer::setShapeVolumeMassProperties(convexInfo.m_shape, convexInfo.m_mass, convexInfo);
-		convexInfo.m_motionType = hkpMotion::MOTION_BOX_INERTIA;
-	}
-	else
-	{
-		convexInfo.m_motionType = hkpMotion::MOTION_FIXED;
-	}
-
-	convexInfo.m_rotation.setIdentity();
-	convexInfo.m_position = position;
-
-	hkpRigidBody* convexRigidBody = new hkpRigidBody(convexInfo);
-
-	cvs->removeReference();
-
-	return convexRigidBody;
-}*/
 
 PintJointHandle Havok::CreateJoint(const PINT_JOINT_CREATE& desc)
 {

@@ -431,7 +431,7 @@
 					RelativePath="..\PINT_Common\PINT_CommonHavok.cpp"
 					>
 					<FileConfiguration
-						Name="Release|Win32"
+						Name="Debug|Win32"
 						>
 						<Tool
 							Name="VCCLCompilerTool"

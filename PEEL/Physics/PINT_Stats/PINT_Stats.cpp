@@ -26,7 +26,9 @@ Stats::Stats() :
 	mNbConvexShapes		(0),
 	mNbMeshShapes		(0),
 	mTotalNbVerts		(0),
-	mTotalNbTris		(0)
+	mTotalNbTris		(0),
+	mNbAggregates		(0),
+	mNbArticulations	(0)
 {
 }
 
@@ -43,25 +45,36 @@ StatsPint::~StatsPint()
 void StatsPint::GetCaps(PintCaps& caps) const
 {
 	caps.mSupportRigidBodySimulation	= true;
+	caps.mSupportCylinders				= true;
+	caps.mSupportConvexes				= true;
+	caps.mSupportMeshes					= true;
+	caps.mSupportMassForInertia			= true;
 	caps.mSupportKinematics				= true;
 	caps.mSupportCollisionGroups		= true;
 	caps.mSupportCompounds				= true;
-	caps.mSupportConvexes				= true;
-	caps.mSupportMeshes					= true;
+	caps.mSupportAggregates				= true;
+	//
 	caps.mSupportSphericalJoints		= true;
 	caps.mSupportHingeJoints			= true;
 	caps.mSupportFixedJoints			= true;
 	caps.mSupportPrismaticJoints		= true;
+	caps.mSupportDistanceJoints			= true;
+	caps.mSupportArticulations			= true;
+	//
 	caps.mSupportPhantoms				= true;
 	caps.mSupportRaycasts				= true;
+	//
 	caps.mSupportBoxSweeps				= true;
 	caps.mSupportSphereSweeps			= true;
 	caps.mSupportCapsuleSweeps			= true;
 	caps.mSupportConvexSweeps			= true;
+	//
 	caps.mSupportSphereOverlaps			= true;
 	caps.mSupportBoxOverlaps			= true;
 	caps.mSupportCapsuleOverlaps		= true;
 	caps.mSupportConvexOverlaps			= true;
+	//
+	caps.mSupportVehicles				= true;
 }
 
 void StatsPint::Init(const PINT_WORLD_CREATE& desc)
@@ -159,6 +172,7 @@ PintObjectHandle StatsPint::CreateObject(const PINT_OBJECT_CREATE& desc)
 
 bool StatsPint::ReleaseObject(PintObjectHandle handle)
 {
+	//###TODO: update stats
 	return false;
 }
 
@@ -169,71 +183,25 @@ PintJointHandle StatsPint::CreateJoint(const PINT_JOINT_CREATE& desc)
 	return null;
 }
 
-void StatsPint::SetDisabledGroups(udword nb_groups, const PintDisabledGroups* groups)
+PintObjectHandle StatsPint::CreateAggregate(udword max_size, bool enable_self_collision)
 {
-}
-
-void* StatsPint::CreatePhantom(const AABB& box)
-{
+	mStats.mNbAggregates++;
+	mUpdateUI = true;
 	return null;
 }
 
-udword StatsPint::BatchRaycastsPhantom(udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts, void** phantoms)
+PintObjectHandle StatsPint::CreateArticulation(const PINT_ARTICULATION_CREATE&)
 {
-	return 0;
+	mStats.mNbArticulations++;
+	mUpdateUI = true;
+	return null;
 }
 
-udword StatsPint::BatchRaycasts(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts)
+PintObjectHandle StatsPint::CreateArticulatedObject(const PINT_OBJECT_CREATE&, const PINT_ARTICULATED_BODY_CREATE&, PintObjectHandle articulation)
 {
-	return 0;
-}
-
-udword StatsPint::BatchBoxSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintBoxSweepData* sweeps)
-{
-	return 0;
-}
-
-udword StatsPint::BatchSphereSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintSphereSweepData* sweeps)
-{
-	return 0;
-}
-
-udword StatsPint::BatchCapsuleSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintCapsuleSweepData* sweeps)
-{
-	return 0;
-}
-
-udword StatsPint::BatchSphereOverlapAny(PintSQThreadContext context, udword nb, PintBooleanHit* dest, const PintSphereOverlapData* overlaps)
-{
-	return 0;
-}
-
-udword StatsPint::BatchSphereOverlapObjects(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintSphereOverlapData* overlaps)
-{
-	return 0;
-}
-
-PR StatsPint::GetWorldTransform(PintObjectHandle handle)
-{
-	return PR();
-}
-
-void StatsPint::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
-{
-}
-
-udword StatsPint::GetShapes(PintObjectHandle* shapes, PintObjectHandle handle)
-{
-	return 0;
-}
-
-void StatsPint::SetLocalRot(PintObjectHandle handle, const Quat& q)
-{
-}
-
-bool StatsPint::GetConvexData(PintObjectHandle handle, PINT_CONVEX_CREATE& data)
-{
-	return false;
+	mStats.mNbDynamics++;
+	mUpdateUI = true;
+	return null;
 }
 
 
@@ -276,6 +244,8 @@ static void UpdateStatsUI(const Stats& stats, const PINT_WORLD_CREATE* create)
 		const udword TotalNbShapes = stats.mNbBoxShapes + stats.mNbSphereShapes + stats.mNbCapsuleShapes + stats.mNbConvexShapes + stats.mNbMeshShapes;
 
 		CustomArray CA;
+		if(create)
+			CA.StoreASCII(_F("Gravity:\n%.4f  |  %.4f  |  %.4f\n\n", create->mGravity.x, create->mGravity.y, create->mGravity.z));
 		CA.StoreASCII(_F("%d actors:\n=======\n", TotalNbActors));
 		CA.StoreASCII(_F("%d static actors:\n", stats.mNbStatics));
 		CA.StoreASCII(_F("    %d singles\n", stats.mNbStatics - stats.mNbStaticCompounds));
@@ -283,8 +253,10 @@ static void UpdateStatsUI(const Stats& stats, const PINT_WORLD_CREATE* create)
 		CA.StoreASCII(_F("%d dynamic actors:\n", stats.mNbDynamics));
 		CA.StoreASCII(_F("    %d singles\n", stats.mNbDynamics - stats.mNbDynamicCompounds));
 		CA.StoreASCII(_F("    %d compounds\n", stats.mNbDynamicCompounds));
+		CA.StoreASCII(_F("%d aggregates\n", stats.mNbAggregates));
 		CA.StoreASCII("\nJoints:\n=====\n");
 		CA.StoreASCII(_F("%d joints\n", stats.mNbJoints));
+		CA.StoreASCII(_F("%d articulations\n", stats.mNbArticulations));
 		CA.StoreASCII(_F("\n%d shapes:\n========\n", TotalNbShapes));
 		CA.StoreASCII(_F("%d box shapes\n", stats.mNbBoxShapes));
 		CA.StoreASCII(_F("%d sphere shapes\n", stats.mNbSphereShapes));
@@ -358,7 +330,7 @@ IceWindow* Stats_InitGUI(IceWidget* parent, PintGUIHelper& helper)
 
 	{
 //		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "Summary:", gStatsGUI);
-		gEditBox_Stats = helper.CreateEditBox(Main, STATS_GUI_EDIT_BOX_STATS, 4+OffsetX, y, 300, 300, "", gStatsGUI, EDITBOX_TEXT, null);
+		gEditBox_Stats = helper.CreateEditBox(Main, STATS_GUI_EDIT_BOX_STATS, 4+OffsetX, y, 300, 400, "", gStatsGUI, EDITBOX_TEXT, null);
 		gEditBox_Stats->SetReadOnly(true);
 
 //		y += YStep;

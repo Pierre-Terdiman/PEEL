@@ -44,7 +44,9 @@
 		virtual	udword							BatchSphereOverlapObjects(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintSphereOverlapData* overlaps);
 
 		virtual	PR								GetWorldTransform(PintObjectHandle handle);
-		virtual	void							ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos);
+
+//		virtual	void							ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos);
+		virtual	void							AddWorldImpulseAtWorldPos(PintObjectHandle handle, const Point& world_impulse, const Point& world_pos);
 
 		virtual	bool							SetKinematicPose(PintObjectHandle handle, const Point& pos);
 		//~Pint

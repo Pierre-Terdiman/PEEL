@@ -6,6 +6,19 @@
  */
 ///////////////////////////////////////////////////////////////////////////////
 
+// PhysX 3.2 DLLs:
+// - PhysX3PROFILE_x86_3_2.dll
+// - PhysX3CookingPROFILE_x86_3_2.dll
+// - PhysX3CommonPROFILE_x86_3_2.dll
+//
+// - PhysX3DEBUG_x86_3_2.dll
+// - PhysX3CookingDEBUG_x86_3_2.dll
+// - PhysX3CommonDEBUG_x86_3_2.dll
+//
+// - PhysX3_x86_3_2.dll
+// - PhysX3Cooking_x86_3_2.dll
+// - PhysX3Common_x86_3_2.dll
+
 #include "stdafx.h"
 #include "PINT_PhysX32.h"
 #include "..\PINT_Common\PINT_Common.h"
@@ -18,8 +31,6 @@
 #include "..\PINT_Common\PINT_CommonPhysX3.h"
 
 //#define USE_LOAD_LIBRARY
-//#define SCRATCHPAD_SIZE	16*1024*32
-//#define SCRATCHPAD_SIZE	16*1024*320
 
 /*
 ..\PhysX-3.2_PC_SDK_Core\Lib\win32\PhysX3_x86.lib
@@ -47,14 +58,14 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static			float						gGlobalBoxSize					= 10000.0f;
+/*static			float						gGlobalBoxSize					= 10000.0f;
 static			udword						gNbThreads						= 0;
 static			PxPruningStructure::Enum	gStaticPruner					= PxPruningStructure::eSTATIC_AABB_TREE;
 static			PxPruningStructure::Enum	gDynamicPruner					= PxPruningStructure::eDYNAMIC_AABB_TREE;
 static			udword						gSolverIterationCountPos		= 4;
 static			udword						gSolverIterationCountVel		= 1;
 static			bool						gSQFlag							= true;
-static			bool						gSQFilterOutAllShapes			= false;
+static			bool						mParams.mSQFilterOutAllShapes			= false;
 static			bool						gSQInitialOverlap				= false;
 static			bool						gEnableSleeping					= false;
 static			bool						gShareMeshData					= true;
@@ -66,7 +77,6 @@ static			bool						gFlushSimulation				= false;
 static			bool						gDisableStrongFriction			= false;
 static			bool						gEnableOneDirFriction			= false;
 static			bool						gEnableTwoDirFriction			= false;
-static	const	bool						gEnableCollisionBetweenJointed	= false;
 static			float						gLinearDamping					= 0.1f;
 static			float						gAngularDamping					= 0.05f;
 #ifdef BETA2
@@ -76,7 +86,7 @@ static			bool						gUsePVD							= false;
 static			bool						gUseFullPvdConnection			= true;
 static			bool						gUseCCD							= false;
 static			float						gContactOffset					= 0.002f;
-static			float						gRestOffset						= 0.0f;
+static			float						gRestOffset						= 0.0f;*/
 
 #define	NB_DEBUG_VIZ_PARAMS	16
 static			bool						gDebugVizParams[NB_DEBUG_VIZ_PARAMS] = {0};
@@ -140,51 +150,6 @@ static void SetupDelayHook()
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#ifdef BETA2
-// ### calling the PxExtensions version crashes, for some reason
-static void _PxSetGroup(const PxRigidActor& actor, const PxU16 collisionGroup)
-{
-	PX_ASSERT(collisionGroup < 32);
-
-	PxFilterData fd;
-	
-	if (actor.getNbShapes() == 1)
-	{
-		PxShape* shape = NULL;
-		actor.getShapes(&shape, 1);
-
-		// retrieve current group mask
-		fd = shape->getSimulationFilterData();
-		fd.word0 = collisionGroup;
-		
-		// set new filter data
-		shape->setSimulationFilterData(fd);
-	}
-	else
-	{
-		PxShape** shapes;
-//		shapes = PX_NEW(PxShape*)[actor.getNbShapes()];
-		shapes = new PxShape*[actor.getNbShapes()];
-		actor.getShapes(shapes, actor.getNbShapes());
-
-		for(PxU32 i=0; i < actor.getNbShapes(); i++)
-		{
-			// retrieve current group mask
-			fd = shapes[i]->getSimulationFilterData();
-			fd.word0 = collisionGroup;
-			
-			// set new filter data
-			shapes[i]->setSimulationFilterData(fd);
-		}
-
-//		PX_DELETE_ARRAY(shapes);
-		delete [] shapes;
-	}
-}
-#endif
-
-///////////////////////////////////////////////////////////////////////////////
-
 #define SUPPORT_PVD
 
 #ifdef SUPPORT_PVD
@@ -206,15 +171,15 @@ public:
 	virtual	void		onPvdDisconnected(PvdConnection& inFactory);
 	//~PvdConnectionHandler
 
-			void		togglePvdConnection();
-			void		createPvdConnection();
+			void		togglePvdConnection(const EditableParams& params);
+			void		createPvdConnection(const EditableParams& params);
 
 			PxPhysics*	mPhysics;
 };
 
 #define	PVD_HOST	"127.0.0.1"
 
-void PVDHelper::togglePvdConnection()
+void PVDHelper::togglePvdConnection(const EditableParams& params)
 {
 	PvdConnectionManager* pvd = mPhysics->getPvdConnectionManager();
 	if(!pvd)
@@ -223,10 +188,10 @@ void PVDHelper::togglePvdConnection()
 	if(pvd->isConnected())
 		pvd->disconnect();
 	else
-		createPvdConnection();
+		createPvdConnection(params);
 }
 
-void PVDHelper::createPvdConnection()
+void PVDHelper::createPvdConnection(const EditableParams& params)
 {
 	PvdConnectionManager* pvd = mPhysics->getPvdConnectionManager();
 	if(!pvd)
@@ -258,11 +223,11 @@ void PVDHelper::createPvdConnection()
 	//TConnectionFlagsType theConnectionFlags( PvdConnectionType::Profile )
 #ifdef BETA2
 	TConnectionFlagsType theConnectionFlags( PvdConnectionType::Debug | PvdConnectionType::Profile | PvdConnectionType::Memory );
-	if(!gUseFullPvdConnection)
+	if(!params.mUseFullPvdConnection)
 		theConnectionFlags = TConnectionFlagsType(PvdConnectionType::Profile);
 #else
 	PxVisualDebuggerConnectionFlags theConnectionFlags( PxVisualDebuggerExt::getAllConnectionFlags() );
-	if(!gUseFullPvdConnection)
+	if(!params.mUseFullPvdConnection)
 		theConnectionFlags = PxVisualDebuggerConnectionFlag::Profile;
 #endif
 
@@ -313,14 +278,9 @@ static PVDHelper* gPVDHelper = null;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-PhysX::PhysX() :
-	mFoundation			(null),
-	mProfileZoneManager	(null),
-	mPhysics			(null),
-	mCooking			(null),
-	mScene				(null),
-	mDefaultMaterial	(null),
-	mScratchPad			(null)
+PhysX::PhysX(const EditableParams& params) :
+	SharedPhysX			(params),
+	mProfileZoneManager	(null)
 {
 }
 
@@ -329,58 +289,42 @@ PhysX::~PhysX()
 	ASSERT(!gDefaultCPUDispatcher);
 	ASSERT(!gDefaultErrorCallback);
 	ASSERT(!gDefaultAllocator);
-	ASSERT(!mFoundation);
-	ASSERT(!mPhysics);
-	ASSERT(!mCooking);
-	ASSERT(!mScene);
-	ASSERT(!mDefaultMaterial);
 	ASSERT(!mProfileZoneManager);
-	ASSERT(!mScratchPad);
 }
 
 void PhysX::GetCaps(PintCaps& caps) const
 {
 	caps.mSupportRigidBodySimulation	= true;
+	caps.mSupportMassForInertia			= true;
 	caps.mSupportKinematics				= true;
 	caps.mSupportCollisionGroups		= true;
 	caps.mSupportCompounds				= true;
 	caps.mSupportConvexes				= true;
 	caps.mSupportMeshes					= true;
+	caps.mSupportAggregates				= true;
+	caps.mSupportArticulations			= true;
 	caps.mSupportSphericalJoints		= true;
 	caps.mSupportHingeJoints			= true;
 	caps.mSupportFixedJoints			= true;
 	caps.mSupportPrismaticJoints		= true;
-	caps.mSupportPhantoms				= false;
+	caps.mSupportDistanceJoints			= true;
 	caps.mSupportRaycasts				= true;
 	caps.mSupportBoxSweeps				= true;
 	caps.mSupportSphereSweeps			= true;
 	caps.mSupportCapsuleSweeps			= true;
-	caps.mSupportConvexSweeps			= false;
 	caps.mSupportSphereOverlaps			= true;
 	caps.mSupportBoxOverlaps			= true;
 	caps.mSupportCapsuleOverlaps		= true;
-	caps.mSupportConvexOverlaps			= false;
 }
 
 static PxFilterFlags CCDSimulationFilterShader(
-	PxFilterObjectAttributes attributes0,
-	PxFilterData filterData0, 
-	PxFilterObjectAttributes attributes1,
-	PxFilterData filterData1,
-	PxPairFlags& pairFlags,
-	const void* constantBlock,
-	PxU32 constantBlockSize)
+	PxFilterObjectAttributes attributes0, PxFilterData filterData0, 
+	PxFilterObjectAttributes attributes1, PxFilterData filterData1,
+	PxPairFlags& pairFlags, const void* constantBlock, PxU32 constantBlockSize)
 {
-	// let triggers through
-	if(PxFilterObjectIsTrigger(attributes0) || PxFilterObjectIsTrigger(attributes1))
-	{
-		pairFlags = PxPairFlag::eTRIGGER_DEFAULT;
-		return PxFilterFlags();
-	}
-
-	pairFlags = PxPairFlag::eCONTACT_DEFAULT|PxPairFlag::eSWEPT_INTEGRATION_LINEAR;
-
-	return PxFilterFlags();
+	PxFilterFlags DefaultFlags = PxDefaultSimulationFilterShader(attributes0, filterData0, attributes1, filterData1, pairFlags, constantBlock, constantBlockSize);
+	pairFlags |= PxPairFlag::eSWEPT_INTEGRATION_LINEAR;
+	return DefaultFlags;
 }
 
 #ifdef USE_LOAD_LIBRARY
@@ -434,7 +378,7 @@ void PhysX::Init(const PINT_WORLD_CREATE& desc)
 	ASSERT(mFoundation);
 
 #ifdef SUPPORT_PVD
-	if(gUsePVD)
+	if(mParams.mUsePVD)
 	{
 		ASSERT(!mProfileZoneManager);
 		mProfileZoneManager = &PxProfileZoneManager::createProfileZoneManager(mFoundation);
@@ -456,23 +400,25 @@ void PhysX::Init(const PINT_WORLD_CREATE& desc)
 
 	bool status = PxInitExtensions(*mPhysics);
 	ASSERT(status);
-	gDefaultCPUDispatcher = PxDefaultCpuDispatcherCreate(gNbThreads, null);
+	gDefaultCPUDispatcher = PxDefaultCpuDispatcherCreate(mParams.mNbThreads, null);
 
-	ASSERT(!mCooking);
-	PxCookingParams Params;
-#ifdef USE_LOAD_LIBRARY
-	mCooking = (func2)(PX_PHYSICS_VERSION, *mFoundation, Params);
-#else
-	mCooking = PxCreateCooking(PX_PHYSICS_VERSION, *mFoundation, Params);
-#endif
-	ASSERT(mCooking);
+	{
+		ASSERT(!mCooking);
+		PxCookingParams Params;
+	#ifdef USE_LOAD_LIBRARY
+		mCooking = (func2)(PX_PHYSICS_VERSION, *mFoundation, Params);
+	#else
+		mCooking = PxCreateCooking(PX_PHYSICS_VERSION, *mFoundation, Params);
+	#endif
+		ASSERT(mCooking);
+	}
 
 #ifdef SUPPORT_PVD
-	if(gUsePVD)
+	if(mParams.mUsePVD)
 	{
 		gPVDHelper = new PVDHelper(mPhysics);
 
-		gPVDHelper->togglePvdConnection();
+		gPVDHelper->togglePvdConnection(mParams);
 
 		if(mPhysics->getPvdConnectionManager())
 			mPhysics->getPvdConnectionManager()->addHandler(*gPVDHelper);
@@ -482,69 +428,54 @@ void PhysX::Init(const PINT_WORLD_CREATE& desc)
 	ASSERT(!mScene);
 	PxSceneDesc sceneDesc(scale);
 	sceneDesc.gravity					= ToPxVec3(desc.mGravity);
-	sceneDesc.filterShader				= gUseCCD ? CCDSimulationFilterShader : PxDefaultSimulationFilterShader;
+	sceneDesc.filterShader				= mParams.mUseCCD ? CCDSimulationFilterShader : PxDefaultSimulationFilterShader;
 	sceneDesc.cpuDispatcher				= gDefaultCPUDispatcher;
 #ifdef BETA2
 	sceneDesc.maxBounds					= PxBounds3(PxVec3(-gGlobalBoxSize), PxVec3(gGlobalBoxSize));
 	sceneDesc.upAxis					= 1;
 #endif
-	sceneDesc.staticStructure			= gStaticPruner;
-	sceneDesc.dynamicStructure			= gDynamicPruner;
-//	sceneDesc.dynamicTreeRebuildRateHint= 10;
+	sceneDesc.staticStructure			= mParams.mStaticPruner;
+	sceneDesc.dynamicStructure			= mParams.mDynamicPruner;
+	sceneDesc.dynamicTreeRebuildRateHint= mParams.mSQDynamicRebuildRateHint;
 #ifdef BETA2
 	sceneDesc.num16KContactDataBlocks	= gNum16KContactDataBlocks;
 #endif
-	if(gPCM)
-		sceneDesc.flags					|= PxSceneFlag::eENABLE_PCM;
-	if(gAdaptiveForce)
-		sceneDesc.flags					|= PxSceneFlag::eADAPTIVE_FORCE;
-	if(!gEnableSSE)
-		sceneDesc.flags					|= PxSceneFlag::eDISABLE_SSE;
-	if(gEnableActiveTransforms)
-		sceneDesc.flags					|= PxSceneFlag::eENABLE_ACTIVETRANSFORMS;
-	if(gEnableOneDirFriction)
-		sceneDesc.flags					|= PxSceneFlag::eENABLE_ONE_DIRECTIONAL_FRICTION;
-	if(gEnableTwoDirFriction)
-		sceneDesc.flags					|= PxSceneFlag::eENABLE_TWO_DIRECTIONAL_FRICTION;
-	if(gUseCCD)
-		sceneDesc.flags					|= PxSceneFlag::eENABLE_SWEPT_INTEGRATION;
+	SetSceneFlag(sceneDesc, PxSceneFlag::eENABLE_PCM,				mParams.mPCM);
+	SetSceneFlag(sceneDesc, PxSceneFlag::eADAPTIVE_FORCE,			mParams.mAdaptiveForce);
+//	SetSceneFlag(sceneDesc, PxSceneFlag::eENABLE_STABILIZATION,		mParams.mStabilization);
+	SetSceneFlag(sceneDesc, PxSceneFlag::eENABLE_ACTIVETRANSFORMS,	mParams.mEnableActiveTransforms);
+	SetSceneFlag(sceneDesc, PxSceneFlag::eDISABLE_CONTACT_CACHE,	!mParams.mEnableContactCache);
+	SetSceneFlag(sceneDesc, PxSceneFlag::eENABLE_SWEPT_INTEGRATION,	mParams.mUseCCD);
+
+	SetSceneFlag(sceneDesc, PxSceneFlag::eDISABLE_SSE,						!mParams.mEnableSSE);
+	SetSceneFlag(sceneDesc, PxSceneFlag::eENABLE_ONE_DIRECTIONAL_FRICTION,	mParams.mEnableOneDirFriction);
+	SetSceneFlag(sceneDesc, PxSceneFlag::eENABLE_TWO_DIRECTIONAL_FRICTION,	mParams.mEnableTwoDirFriction);
+
+//	sceneDesc.ccdMaxPasses	= mParams.mMaxNbCCDPasses;
 
 	mScene = mPhysics->createScene(sceneDesc);
 	ASSERT(mScene);
 
-//	mScene->setDynamicTreeRebuildRateHint(10);
-//	mScene->setDynamicTreeRebuildRateHint(5);
-
 	// Create default material
 	{
 		PINT_MATERIAL_CREATE Desc;
-		Desc.mStaticFriction	= 0.5f;
-		Desc.mDynamicFriction	= 0.5f;
+		Desc.mStaticFriction	= mParams.mDefaultFriction;
+		Desc.mDynamicFriction	= mParams.mDefaultFriction;
 		Desc.mRestitution		= 0.0f;
 		mDefaultMaterial = CreateMaterial(Desc);
 		ASSERT(mDefaultMaterial);
 	}
 
+	InitCommon();
 	UpdateFromUI();
-
-#ifdef SCRATCHPAD_SIZE
-	mScratchPad = _aligned_malloc(SCRATCHPAD_SIZE, 16);
-#endif
-}
-
-void PhysX::SetGravity(const Point& gravity)
-{
-	ASSERT(mScene);
-	mScene->setGravity(ToPxVec3(gravity));
 }
 
 void PhysX::Close()
 {
-	_aligned_free(mScratchPad);
-
+	CloseCommon();
 #ifdef SUPPORT_PVD
 	if(gPVDHelper)
-		gPVDHelper->togglePvdConnection();
+		gPVDHelper->togglePvdConnection(mParams);
 	DELETESINGLE(gPVDHelper);
 #endif
 
@@ -573,20 +504,8 @@ void PhysX::UpdateFromUI()
 
 udword PhysX::Update(float dt)
 {
-	if(mScene)
-	{
-#ifdef SCRATCHPAD_SIZE
-		mScene->simulate(dt, NULL, mScratchPad, SCRATCHPAD_SIZE);
-#else
-		mScene->simulate(dt);
-#endif
-		mScene->fetchResults(true);
-
-		if(gFlushSimulation)
-			mScene->flush();
-	}
+	UpdateCommon(dt);
 	return gDefaultAllocator->mCurrentMemory;
-//	return 0;
 }
 
 Point PhysX::GetMainColor()
@@ -594,258 +513,9 @@ Point PhysX::GetMainColor()
 	return Point(1.0f, 0.0f, 0.0f);
 }
 
-void PhysX::Render(PintRender& renderer)
+void PhysX::CreateShapes(const PINT_OBJECT_CREATE& desc, PxRigidActor* actor)
 {
-	if(mScene)
-	{
-		const PxActorTypeSelectionFlags selectionFlags = PxActorTypeSelectionFlag::eRIGID_STATIC | PxActorTypeSelectionFlag::eRIGID_DYNAMIC;
-		const PxU32 nbActors = mScene->getNbActors(selectionFlags);
-
-		PxActor* buffer[64];
-		PxU32 nbProcessed = 0;
-		while(nbProcessed!=nbActors)
-		{
-			const PxU32 nb = mScene->getActors(selectionFlags, buffer, 64, nbProcessed);
-			nbProcessed += nb;
-
-			for(PxU32 i=0;i<nb;i++)
-			{
-				PxActor* actor = buffer[i];
-				const PxType type = actor->getConcreteType();
-				if(type==PxConcreteType::eRIGID_STATIC || type==PxConcreteType::eRIGID_DYNAMIC)
-				{
-					PxRigidActor* rigidActor = static_cast<PxRigidActor*>(actor);
-
-//					const PxTransform pose = rigidActor->getGlobalPose();
-
-					PxU32 nbShapes = rigidActor->getNbShapes();
-					for(PxU32 j=0;j<nbShapes;j++)
-					{
-						PxShape* shape = null;
-						PxU32 nb = rigidActor->getShapes(&shape, 1, j);
-						ASSERT(nb==1);
-						ASSERT(shape);
-
-						const PxTransform Pose = PxShapeExt::getGlobalPose(*shape);
-						const PR IcePose(ToPoint(Pose.p), ToQuat(Pose.q));
-
-						ASSERT(shape->userData);
-						if(shape->userData)
-						{
-							PintShapeRenderer* shapeRenderer = (PintShapeRenderer*)shape->userData;
-
-							const PxGeometryType::Enum geomType = shape->getGeometryType();
-							if(geomType==PxGeometryType::eCAPSULE)
-							{
-								// ### PhysX is weird with capsules
-/*								Matrix3x3 Rot;
-								Rot.RotZ(HALFPI);
-								Quat QQ = IcePose.mRot * Quat(Rot);*/
-
-								// ### precompute
-								const PxQuat q = PxShortestRotation(PxVec3(0.0f, 1.0f, 0.0f), PxVec3(1.0f, 0.0f, 0.0f));
-								Quat QQ = IcePose.mRot * ToQuat(q);
-
-								shapeRenderer->Render(PR(IcePose.mPos, QQ));
-							}
-							else
-							{
-								shapeRenderer->Render(IcePose);
-							}
-						}
-/*						else
-						{
-							const PxGeometryType::Enum geomType = shape->getGeometryType();
-							if(geomType==PxGeometryType::eSPHERE)
-							{
-								PxSphereGeometry geometry;
-								bool status = shape->getSphereGeometry(geometry);
-								ASSERT(status);
-
-								renderer.DrawSphere(geometry.radius, IcePose);
-							}
-							else if(geomType==PxGeometryType::eBOX)
-							{
-								PxBoxGeometry geometry;
-								bool status = shape->getBoxGeometry(geometry);
-								ASSERT(status);
-
-								renderer.DrawBox(ToPoint(geometry.halfExtents), IcePose);
-							}
-							else if(geomType==PxGeometryType::eCAPSULE)
-							{
-								ASSERT(0);
-							}
-							else if(geomType==PxGeometryType::eCONVEXMESH)
-							{
-								ASSERT(0);
-							}
-							else ASSERT(0);
-						}*/
-					}
-				}
-			}
-		}
-
-		const PxRenderBuffer& RenderBuffer = mScene->getRenderBuffer();
-		udword NbLines = RenderBuffer.getNbLines();
-		const PxDebugLine* Lines = RenderBuffer.getLines();
-		const Point LineColor(1.0f, 1.0f, 1.0f);
-		for(udword i=0;i<NbLines;i++)
-		{
-			renderer.DrawLine(ToPoint(Lines[i].pos0), ToPoint(Lines[i].pos1), LineColor);
-		}
-
-		udword NbTris = RenderBuffer.getNbTriangles();
-		const PxDebugTriangle* Triangles = RenderBuffer.getTriangles();
-		const Point TrisColor(1.0f, 1.0f, 1.0f);
-		for(udword i=0;i<NbTris;i++)
-		{
-			renderer.DrawTriangle(ToPoint(Triangles[i].pos0), ToPoint(Triangles[i].pos1), ToPoint(Triangles[i].pos2), TrisColor);
-		}
-	}
-}
-
-PxMaterial* PhysX::CreateMaterial(const PINT_MATERIAL_CREATE& desc)
-{
-	const PxU32 NbMaterials = mMaterials.size();
-	for(PxU32 i=0;i<NbMaterials;i++)
-	{
-		PxMaterial* M = mMaterials[i];
-		if(		M->getRestitution()==desc.mRestitution
-			&&	M->getStaticFriction()==desc.mStaticFriction
-			&&	M->getDynamicFriction()==desc.mDynamicFriction)
-		{
-			return M;
-		}
-	}
-
-	ASSERT(mPhysics);
-	PxMaterial* M = mPhysics->createMaterial(desc.mStaticFriction, desc.mDynamicFriction, desc.mRestitution);
-	ASSERT(M);
-	if(gDisableStrongFriction)
-		M->setFlags(PxMaterialFlag::eDISABLE_STRONG_FRICTION);
-//	M->setFrictionCombineMode(PxCombineMode::eMIN);
-//	M->setRestitutionCombineMode(PxCombineMode::eMIN);
-	PxCombineMode::Enum defMode = M->getFrictionCombineMode();
-	mMaterials.push_back(M);
-	return M;
-}
-
-PxConvexMesh* PhysX::CreateConvexMesh(const Point* verts, udword vertCount, PxConvexFlags flags, PintShapeRenderer* renderer)
-{
-	ASSERT(mCooking);
-	ASSERT(mPhysics);
-
-	if(gShareMeshData && renderer)
-	{
-		const udword Size = mConvexes.size();
-		for(udword i=0;i<Size;i++)
-		{
-			const ConvexRender& CurrentConvex = mConvexes[i];
-			if(CurrentConvex.mRenderer==renderer)
-			{
-//				printf("Sharing convex mesh\n");
-				return CurrentConvex.mConvexMesh;
-			}
-		}
-	}
-
-	PxConvexMeshDesc ConvexDesc;
-	ConvexDesc.points.count		= vertCount;
-	ConvexDesc.points.stride	= sizeof(PxVec3);
-	ConvexDesc.points.data		= verts;
-	ConvexDesc.flags			= flags;
-
-	MemoryOutputStream buf;
-	if(!mCooking->cookConvexMesh(ConvexDesc, buf))
-		return null;
-
-	MemoryInputData input(buf.getData(), buf.getSize());
-	PxConvexMesh* NewConvex = mPhysics->createConvexMesh(input);
-
-	if(renderer)
-	{
-		ConvexRender NewConvexRender;
-		NewConvexRender.mConvexMesh = NewConvex;
-		NewConvexRender.mRenderer = renderer;
-		mConvexes.push_back(NewConvexRender);
-	}
-	return NewConvex;
-}
-
-PxTriangleMesh* PhysX::CreateTriangleMesh(const SurfaceInterface& surface, PintShapeRenderer* renderer)
-{
-	ASSERT(mCooking);
-	ASSERT(mPhysics);
-
-	if(gShareMeshData && renderer)
-	{
-		const udword Size = mMeshes.size();
-		for(udword i=0;i<Size;i++)
-		{
-			const MeshRender& CurrentMesh = mMeshes[i];
-			if(CurrentMesh.mRenderer==renderer)
-			{
-				return CurrentMesh.mTriangleMesh;
-			}
-		}
-	}
-
-	PxTriangleMeshDesc MeshDesc;
-	MeshDesc.points.count		= surface.mNbVerts;
-	MeshDesc.points.stride		= sizeof(PxVec3);
-	MeshDesc.points.data		= surface.mVerts;
-	MeshDesc.triangles.count	= surface.mNbFaces;
-	MeshDesc.triangles.stride	= sizeof(udword)*3;
-	MeshDesc.triangles.data		= surface.mDFaces;
-//	MeshDesc.flags				= PxMeshFlag::eFLIPNORMALS;
-//	MeshDesc.flags				= 0;
-
-	MemoryOutputStream buf;
-	if(!mCooking->cookTriangleMesh(MeshDesc, buf))
-		return null;
-
-	MemoryInputData input(buf.getData(), buf.getSize());
-	PxTriangleMesh* NewMesh = mPhysics->createTriangleMesh(input);
-
-	if(renderer)
-	{
-		MeshRender NewMeshRender;
-		NewMeshRender.mTriangleMesh = NewMesh;
-		NewMeshRender.mRenderer = renderer;
-		mMeshes.push_back(NewMeshRender);
-	}
-	return NewMesh;
-}
-
-PintObjectHandle PhysX::CreateObject(const PINT_OBJECT_CREATE& desc)
-{
-	udword NbShapes = desc.GetNbShapes();
-	if(!NbShapes)
-		return null;
-
-	ASSERT(mPhysics);
-	ASSERT(mScene);
-
-	const PxTransform pose(ToPxVec3(desc.mPosition), ToPxQuat(desc.mRotation));
-
-	PxRigidActor* actor;
-	PxRigidDynamic* rigidDynamic = null;
-	if(desc.mMass!=0.0f)
-	{
-		rigidDynamic = mPhysics->createRigidDynamic(pose);
-		ASSERT(rigidDynamic);
-		actor = rigidDynamic;
-	}
-	else
-	{
-		PxRigidStatic* rigidStatic = mPhysics->createRigidStatic(pose);
-		ASSERT(rigidStatic);
-		actor = rigidStatic;
-	}
 	ASSERT(actor);
-
 	ASSERT(mDefaultMaterial);
 	const PINT_SHAPE_CREATE* CurrentShape = desc.mShapes;
 	while(CurrentShape)
@@ -916,232 +586,50 @@ PintObjectHandle PhysX::CreateObject(const PINT_OBJECT_CREATE& desc)
 
 		if(shape)
 		{
-//			shape->setFlag(PxShapeFlag::eSIMULATION_SHAPE, false);
-			shape->setFlag(PxShapeFlag::eSCENE_QUERY_SHAPE, gSQFlag);
-			shape->setFlag(PxShapeFlag::eVISUALIZATION, gDebugVizParams[0]);
-			shape->setFlag(PxShapeFlag::eUSE_SWEPT_BOUNDS, gUseCCD);
-			shape->setContactOffset(gContactOffset);
-			shape->setRestOffset(gRestOffset);
-
-			// Setup query filter data so that we can filter out all shapes - debug purpose
-			if(gSQFlag)
-				shape->setQueryFilterData(PxFilterData(1, 0, 0, 0));
-
-			if(CurrentShape->mRenderer)
-				shape->userData = CurrentShape->mRenderer;
+			SetupShape(mParams, CurrentShape, *shape, desc.mCollisionGroup, gDebugVizParams[0]);
+			shape->setFlag(PxShapeFlag::eUSE_SWEPT_BOUNDS, mParams.mUseCCD);
 		}
 
 		CurrentShape = CurrentShape->mNext;
 	}
+}
 
-	if(rigidDynamic)
+/*PintObjectHandle PhysX::CreateObject(const PINT_OBJECT_CREATE& desc)
+{
+	udword NbShapes = desc.GetNbShapes();
+	if(!NbShapes)
+		return null;
+
+	ASSERT(mPhysics);
+	ASSERT(mScene);
+
+	const PxTransform pose(ToPxVec3(desc.mPosition), ToPxQuat(desc.mRotation));
+
+	PxRigidActor* actor;
+	PxRigidDynamic* rigidDynamic = null;
+	if(desc.mMass!=0.0f)
 	{
-		rigidDynamic->setLinearDamping(gLinearDamping);
-		rigidDynamic->setAngularDamping(gAngularDamping);
-		rigidDynamic->setLinearVelocity(ToPxVec3(desc.mLinearVelocity));
-		rigidDynamic->setAngularVelocity(ToPxVec3(desc.mAngularVelocity));
-//		rigidDynamic->setMass(create.mMass);
-		bool status = PxRigidBodyExt::setMassAndUpdateInertia(*rigidDynamic, desc.mMass);
-		ASSERT(status);
-
-		if(!gEnableSleeping)
-			rigidDynamic->wakeUp(9999999999.0f);
-		rigidDynamic->setSolverIterationCounts(gSolverIterationCountPos, gSolverIterationCountVel);
-		rigidDynamic->setRigidDynamicFlag(PxRigidDynamicFlag::eKINEMATIC, desc.mKinematic);
+		rigidDynamic = mPhysics->createRigidDynamic(pose);
+		ASSERT(rigidDynamic);
+		actor = rigidDynamic;
+	}
+	else
+	{
+		PxRigidStatic* rigidStatic = mPhysics->createRigidStatic(pose);
+		ASSERT(rigidStatic);
+		actor = rigidStatic;
 	}
 
-#ifdef BETA2
-	_PxSetGroup(*actor, desc.mCollisionGroup);
-#else
-	PxSetGroup(*actor, desc.mCollisionGroup);
-#endif
+	CreateShapes(desc, actor);
+
+	if(rigidDynamic)
+		SetupDynamic(*rigidDynamic, desc);
 
 	if(desc.mAddToWorld)
 		mScene->addActor(*actor);
 
 	return CreateHandle(actor);
-}
-
-bool PhysX::ReleaseObject(PintObjectHandle handle)
-{
-	PxRigidActor* RigidActor = GetActorFromHandle(handle);
-	if(RigidActor)
-	{
-		// ### what about ConvexRender/etc?
-		RigidActor->release();
-		return true;
-	}
-	PxShape* Shape = GetShapeFromHandle(handle);
-	if(Shape)
-	{
-		RigidActor = &Shape->getActor();
-		RigidActor->release();
-		return true;
-	}
-	ASSERT(0);
-	return false;
-}
-
-PintJointHandle PhysX::CreateJoint(const PINT_JOINT_CREATE& desc)
-{
-	ASSERT(mPhysics);
-
-	PxRigidActor* actor0 = (PxRigidActor*)desc.mObject0;
-	PxRigidActor* actor1 = (PxRigidActor*)desc.mObject1;
-
-	PxJoint* CreatedJoint = null;
-
-	switch(desc.mType)
-	{
-		case PINT_JOINT_SPHERICAL:
-		{
-			const PINT_SPHERICAL_JOINT_CREATE& jc = static_cast<const PINT_SPHERICAL_JOINT_CREATE&>(desc);
-
-			// ### what's the point of having a rotation for pivots here?
-			PxSphericalJoint* j = PxSphericalJointCreate(*mPhysics, actor0, PxTransform(ToPxVec3(jc.mLocalPivot0)), actor1, PxTransform(ToPxVec3(jc.mLocalPivot1)));
-			ASSERT(j);
-			CreatedJoint = j;
-		}
-		break;
-		case PINT_JOINT_HINGE:
-		{
-			const PINT_HINGE_JOINT_CREATE& jc = static_cast<const PINT_HINGE_JOINT_CREATE&>(desc);
-
-//			PxTransform pose0 = PxTransformFromSegment(PxVec3(0.0f), ToPxVec3(jc.mLocalAxis0));
-//			PxTransform pose1 = PxTransformFromSegment(PxVec3(0.0f), ToPxVec3(jc.mLocalAxis1));
-
-			// ### which one??
-			const PxQuat q0 = PxShortestRotation(PxVec3(1.0f, 0.0f, 0.0f), ToPxVec3(jc.mLocalAxis0));
-			const PxQuat q1 = PxShortestRotation(PxVec3(1.0f, 0.0f, 0.0f), ToPxVec3(jc.mLocalAxis0));
-//			const PxQuat q0 = PxShortestRotation(ToPxVec3(jc.mLocalAxis0), PxVec3(1.0f, 0.0f, 0.0f));
-//			const PxQuat q1 = PxShortestRotation(ToPxVec3(jc.mLocalAxis0), PxVec3(1.0f, 0.0f, 0.0f));
-
-			PxRevoluteJoint* j = PxRevoluteJointCreate(*mPhysics,	actor0, PxTransform(ToPxVec3(jc.mLocalPivot0), q0),
-																	actor1, PxTransform(ToPxVec3(jc.mLocalPivot1), q1));
-			ASSERT(j);
-
-			if(!jc.mGlobalAnchor.IsNotUsed() && !jc.mGlobalAxis.IsNotUsed())
-			{
-				const PxVec3 GlobalAnchor = ToPxVec3(jc.mGlobalAnchor);
-				const PxVec3 GlobalAxis = ToPxVec3(jc.mGlobalAxis);
-				PxSetJointGlobalFrame(*j, &GlobalAnchor, &GlobalAxis);
-			}
-
-			// ### what about axes?
-//	const PxQuat q = Ps::computeQuatFromNormal(up);
-//	const PxQuat q = Ps::rotationArc(PxVec3(1.0f, 0.0f, 0.0f), up);
-
-			if(0)
-			{
-				// ### really tedious to setup!
-				const PxTransform m0 = actor0->getGlobalPose();
-				const PxTransform m1 = actor1->getGlobalPose();
-				PxVec3 wsAnchor;
-				{
-					PxVec3 wp0 = m0.transform(ToPxVec3(jc.mLocalPivot0));
-					PxVec3 wp1 = m1.transform(ToPxVec3(jc.mLocalPivot1));
-					wsAnchor = (wp0+wp1)*0.5f;
-				}
-				PxVec3 wsAxis;
-				{
-					PxVec3 wp0 = m0.rotate(ToPxVec3(jc.mLocalAxis0));
-					PxVec3 wp1 = m1.rotate(ToPxVec3(jc.mLocalAxis1));
-					wsAxis = (wp0+wp1)*0.5f; 
-					wsAxis.normalize();
-				}
-				PxSetJointGlobalFrame(*j, &wsAnchor, &wsAxis);
-			}
-
-			if(jc.mMinLimitAngle!=MIN_FLOAT || jc.mMaxLimitAngle!=MAX_FLOAT)
-			{
-				const float limitContactDistance = 0.05f;
-//				const float limitContactDistance = 0.0f;
-
-//				PxJointLimitPair limit(-PxPi/2, PxPi/2, 10.0f);
-//				PxJointLimitPair limit(-PxPi/2, PxPi/2, 0.05f);
-				PxJointLimitPair limit(0.0f, 0.0f, limitContactDistance);
-//				limit.restitution	= 0.0f;
-				//### wtf
-				limit.lower			= -jc.mMaxLimitAngle;
-				limit.upper			= -jc.mMinLimitAngle;
-//limit.lower			= -degToRad(45.0f);
-//limit.upper			= 0.0f;
-
-				j->setLimit(limit);
-//		j->setConstraintFlags(PxConstraintFlag::ePROJECTION);
-//		j->setProjectionLinearTolerance(0.1f);
-
-//				j->setLimit(PxJointLimitPair(jc.mMinLimitAngle, jc.mMaxLimitAngle, TWOPI));
-				j->setRevoluteJointFlag(PxRevoluteJointFlag::eLIMIT_ENABLED, true);
-//				j->setRevoluteJointFlags(PxRevoluteJointFlag::eLIMIT_ENABLED);
-			}
-
-/*
-		PxRevoluteJoint* rv = PxRevoluteJointCreate(physics, b0->mBody, PxTransform::createIdentity(), b1->mBody, PxTransform::createIdentity());
-		mJoints[i] = rv;
-		rv->setConstraintFlags(PxConstraintFlag::ePROJECTION);
-		rv->setProjectionLinearTolerance(0.1f);
-		if(1)
-		{
-			PxJointLimitPair limit(-PxPi/2, PxPi/2, 0.05f);
-			limit.restitution	= 0.0f;
-			limit.lower			= -0.2f;
-			limit.upper			= 0.2f;
-			rv->setLimit(limit);
-
-			rv->setRevoluteJointFlags(PxRevoluteJointFlag::eLIMIT_ENABLED);
-		}
-
-		PxSetJointGlobalFrame(*rv, &globalAnchor, &globalAxis);
-*/
-
-//			j->setConstraintFlags(PxConstraintFlag::ePROJECTION);
-//			j->setProjectionLinearTolerance(0.1f);
-
-			CreatedJoint = j;
-		}
-		break;
-		case PINT_JOINT_FIXED:
-		{
-			const PINT_FIXED_JOINT_CREATE& jc = static_cast<const PINT_FIXED_JOINT_CREATE&>(desc);
-
-			// ### what's the point of having a rotation for pivots here?
-			PxFixedJoint* j = PxFixedJointCreate(*mPhysics, actor0, PxTransform(ToPxVec3(jc.mLocalPivot0)), actor1, PxTransform(ToPxVec3(jc.mLocalPivot1)));
-			ASSERT(j);
-			CreatedJoint = j;
-
-//			j->setConstraintFlags(PxConstraintFlag::ePROJECTION);
-//			j->setProjectionLinearTolerance(0.1f);
-		}
-		break;
-		case PINT_JOINT_PRISMATIC:
-		{
-			const PINT_PRISMATIC_JOINT_CREATE& jc = static_cast<const PINT_PRISMATIC_JOINT_CREATE&>(desc);
-
-			const PxQuat q0 = PxShortestRotation(PxVec3(1.0f, 0.0f, 0.0f), ToPxVec3(jc.mLocalAxis0));
-			const PxQuat q1 = PxShortestRotation(PxVec3(1.0f, 0.0f, 0.0f), ToPxVec3(jc.mLocalAxis0));
-
-			PxPrismaticJoint* j = PxPrismaticJointCreate(*mPhysics,	actor0, PxTransform(ToPxVec3(jc.mLocalPivot0), q0),
-																	actor1, PxTransform(ToPxVec3(jc.mLocalPivot1), q1));
-			ASSERT(j);
-			CreatedJoint = j;
-		}
-		break;
-	}
-
-	if(CreatedJoint)
-	{
-		if(gEnableCollisionBetweenJointed)
-			CreatedJoint->setConstraintFlags(PxConstraintFlag::eCOLLISION_ENABLED);
-	}
-	return CreatedJoint;
-}
-
-void PhysX::SetDisabledGroups(udword nb_groups, const PintDisabledGroups* groups)
-{
-	for(udword i=0;i<nb_groups;i++)
-		PxSetGroupCollisionFlag(groups[i].mGroup0, groups[i].mGroup1, false);
-}
+}*/
 
 static inline_ void FillResultStruct(PintRaycastHit& hit, const PxRaycastHit& result)
 {
@@ -1156,7 +644,7 @@ udword PhysX::BatchRaycasts(PintSQThreadContext context, udword nb, PintRaycastH
 {
 	ASSERT(mScene);
 
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
+	const PxQueryFilterData PF = GetSQFilterData();
 	const PxSceneQueryFlags sqFlags = PxSceneQueryFlag::eIMPACT|PxSceneQueryFlag::eNORMAL|PxSceneQueryFlag::eDISTANCE;
 
 	if(0)
@@ -1234,25 +722,6 @@ udword PhysX::BatchRaycasts(PintSQThreadContext context, udword nb, PintRaycastH
 	}
 }
 
-udword PhysX::BatchRaycastAny(PintSQThreadContext context, udword nb, PintBooleanHit* dest, const PintRaycastData* raycasts)
-{
-	ASSERT(mScene);
-
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
-
-	udword NbHits = 0;
-	while(nb--)
-	{
-		PxRaycastHit Hit;
-		const bool b = mScene->raycastAny(ToPxVec3(raycasts->mOrigin), ToPxVec3(raycasts->mDir), raycasts->mMaxDist, Hit, PF);
-		NbHits += b;
-		dest->mHit = b;
-		raycasts++;
-		dest++;
-	}
-	return NbHits;
-}
-
 static inline_ void FillResultStruct(PintRaycastHit& hit, const PxSweepHit& result)
 {
 	hit.mObject			= CreateHandle(result.shape);
@@ -1262,18 +731,18 @@ static inline_ void FillResultStruct(PintRaycastHit& hit, const PxSweepHit& resu
 	hit.mTriangleIndex	= result.faceIndex;
 }
 
-static inline_ PxSceneQueryFlags GetSweepQueryFlags()
+static inline_ PxSceneQueryFlags GetSweepQueryFlags(const EditableParams& params)
 {
-	return gSQInitialOverlap	?	PxSceneQueryFlag::eIMPACT|PxSceneQueryFlag::eNORMAL|PxSceneQueryFlag::eDISTANCE|PxSceneQueryFlag::eINITIAL_OVERLAP
-								:	PxSceneQueryFlag::eIMPACT|PxSceneQueryFlag::eNORMAL|PxSceneQueryFlag::eDISTANCE;
+	return params.mSQInitialOverlap	?	PxSceneQueryFlag::eIMPACT|PxSceneQueryFlag::eNORMAL|PxSceneQueryFlag::eDISTANCE|PxSceneQueryFlag::eINITIAL_OVERLAP
+									:	PxSceneQueryFlag::eIMPACT|PxSceneQueryFlag::eNORMAL|PxSceneQueryFlag::eDISTANCE;
 }
 
 udword PhysX::BatchBoxSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintBoxSweepData* sweeps)
 {
 	ASSERT(mScene);
 
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
-	const PxSceneQueryFlags sweepQueryFlags = GetSweepQueryFlags();
+	const PxQueryFilterData PF = GetSQFilterData();
+	const PxSceneQueryFlags sweepQueryFlags = GetSweepQueryFlags(mParams);
 
 	udword NbHits = 0;
 	while(nb--)
@@ -1303,8 +772,8 @@ udword PhysX::BatchSphereSweeps(PintSQThreadContext context, udword nb, PintRayc
 {
 	ASSERT(mScene);
 
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
-	const PxSceneQueryFlags sweepQueryFlags = GetSweepQueryFlags();
+	const PxQueryFilterData PF = GetSQFilterData();
+	const PxSceneQueryFlags sweepQueryFlags = GetSweepQueryFlags(mParams);
 
 	udword NbHits = 0;
 	while(nb--)
@@ -1332,8 +801,8 @@ udword PhysX::BatchCapsuleSweeps(PintSQThreadContext context, udword nb, PintRay
 {
 	ASSERT(mScene);
 
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
-	const PxSceneQueryFlags sweepQueryFlags = GetSweepQueryFlags();
+	const PxQueryFilterData PF = GetSQFilterData();
+	const PxSceneQueryFlags sweepQueryFlags = GetSweepQueryFlags(mParams);
 
 	udword NbHits = 0;
 	while(nb--)
@@ -1363,291 +832,8 @@ udword PhysX::BatchCapsuleSweeps(PintSQThreadContext context, udword nb, PintRay
 	return NbHits;
 }
 
-udword PhysX::BatchSphereOverlapAny(PintSQThreadContext context, udword nb, PintBooleanHit* dest, const PintSphereOverlapData* overlaps)
-{
-	ASSERT(mScene);
 
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
-
-	udword NbHits = 0;
-	while(nb--)
-	{
-		const PxTransform Pose(ToPxVec3(overlaps->mSphere.mCenter), PxQuat::createIdentity());
-
-		PxShape* Hit;
-		if(mScene->overlapAny(PxSphereGeometry(overlaps->mSphere.mRadius), Pose, Hit, PF))
-		{
-			NbHits++;
-			dest->mHit = true;
-		}
-		else
-		{
-			dest->mHit = false;
-		}
-		overlaps++;
-		dest++;
-	}
-	return NbHits;
-}
-
-udword PhysX::BatchSphereOverlapObjects(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintSphereOverlapData* overlaps)
-{
-	ASSERT(mScene);
-
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
-
-	udword NbHits = 0;
-	PxShape* Hits[4096];
-	while(nb--)
-	{
-		const PxTransform Pose(ToPxVec3(overlaps->mSphere.mCenter), PxQuat::createIdentity());
-
-		PxI32 Nb = mScene->overlapMultiple(PxSphereGeometry(overlaps->mSphere.mRadius), Pose, Hits, 4096, PF);
-		NbHits += Nb;
-		dest->mNbObjects = Nb;
-
-		overlaps++;
-		dest++;
-	}
-	return NbHits;
-}
-
-udword PhysX::BatchBoxOverlapAny(PintSQThreadContext context, udword nb, PintBooleanHit* dest, const PintBoxOverlapData* overlaps)
-{
-	ASSERT(mScene);
-
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
-
-	udword NbHits = 0;
-	while(nb--)
-	{
-		// ### add this as a helper
-		const Quat Q = overlaps->mBox.mRot;	// ### SIGH
-		const PxTransform Pose(ToPxVec3(overlaps->mBox.mCenter), ToPxQuat(Q));
-
-		PxShape* Hit;
-		if(mScene->overlapAny(PxBoxGeometry(ToPxVec3(overlaps->mBox.mExtents)), Pose, Hit, PF))
-		{
-			NbHits++;
-			dest->mHit = true;
-		}
-		else
-		{
-			dest->mHit = false;
-		}
-		overlaps++;
-		dest++;
-	}
-	return NbHits;
-}
-
-udword PhysX::BatchBoxOverlapObjects(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintBoxOverlapData* overlaps)
-{
-	ASSERT(mScene);
-
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
-
-	udword NbHits = 0;
-	PxShape* Hits[4096];
-	while(nb--)
-	{
-		// ### add this as a helper
-		const Quat Q = overlaps->mBox.mRot;	// ### SIGH
-		const PxTransform Pose(ToPxVec3(overlaps->mBox.mCenter), ToPxQuat(Q));
-
-		PxI32 Nb = mScene->overlapMultiple(PxBoxGeometry(ToPxVec3(overlaps->mBox.mExtents)), Pose, Hits, 4096, PF);
-		NbHits += Nb;
-		dest->mNbObjects = Nb;
-
-		overlaps++;
-		dest++;
-	}
-	return NbHits;
-}
-
-udword PhysX::BatchCapsuleOverlapAny(PintSQThreadContext context, udword nb, PintBooleanHit* dest, const PintCapsuleOverlapData* overlaps)
-{
-	ASSERT(mScene);
-
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
-
-	udword NbHits = 0;
-	while(nb--)
-	{
-		// ### refactor this!
-		const Point Center = (overlaps->mCapsule.mP0 + overlaps->mCapsule.mP1)*0.5f;
-		Point CapsuleAxis = overlaps->mCapsule.mP1 - overlaps->mCapsule.mP0;
-		const float M = CapsuleAxis.Magnitude();
-		CapsuleAxis /= M;
-		const PxQuat q = PxShortestRotation(PxVec3(1.0f, 0.0f, 0.0f), ToPxVec3(CapsuleAxis));
-
-		const PxTransform Pose(ToPxVec3(Center), q);
-
-		PxShape* Hit;
-		if(mScene->overlapAny(PxCapsuleGeometry(overlaps->mCapsule.mRadius, M*0.5f), Pose, Hit, PF))
-		{
-			NbHits++;
-			dest->mHit = true;
-		}
-		else
-		{
-			dest->mHit = false;
-		}
-		overlaps++;
-		dest++;
-	}
-	return NbHits;
-}
-
-udword PhysX::BatchCapsuleOverlapObjects(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintCapsuleOverlapData* overlaps)
-{
-/*	ASSERT(mScene);
-
-	const PxSceneQueryFilterData PF(PxFilterData(!gSQFilterOutAllShapes, gSQFilterOutAllShapes, 0, 0), PxSceneQueryFilterFlag::eDYNAMIC | PxSceneQueryFilterFlag::eSTATIC);
-
-	udword NbHits = 0;
-	PxOverlapHit Hits[4096];
-	while(nb--)
-	{
-		const PxTransform Pose(ToPxVec3(overlaps->mSphere.mCenter), PxQuat::createIdentity());
-
-		PxI32 Nb = mScene->overlapMultiple(PxSphereGeometry(overlaps->mSphere.mRadius), Pose, Hits, 4096, PF);
-		NbHits += Nb;
-		dest->mNbObjects = Nb;
-
-		overlaps++;
-		dest++;
-	}
-	return NbHits;*/
-	return 0;
-}
-
-udword PhysX::FindTriangles_MeshSphereOverlap(PintSQThreadContext context, PintObjectHandle handle, udword nb, const PintSphereOverlapData* overlaps)
-{
-	PxRigidActor* RigidActor = GetActorFromHandle(handle);
-	if(!RigidActor)
-		return 0;
-
-	if(RigidActor->getNbShapes()!=1)
-		return 0;
-
-	PxShape* meshShape = null;
-	RigidActor->getShapes(&meshShape, 1);
-	if(!meshShape)
-		return 0;
-
-	PxTriangleMeshGeometry meshGeom;
-	if(!meshShape->getTriangleMeshGeometry(meshGeom))
-		return 0;
-
-	const PxTransform meshPose = PxShapeExt::getGlobalPose(*meshShape);
-
-	PxU32 Results[8192];
-	udword NbTouchedTriangles = 0;
-	const PxU32 startIndex = 0;
-	while(nb--)
-	{
-		const PxTransform Pose(ToPxVec3(overlaps->mSphere.mCenter), PxQuat::createIdentity());
-
-		bool Overflow = false;
-		PxU32 Nb = PxMeshQuery::findOverlapTriangleMesh(PxSphereGeometry(overlaps->mSphere.mRadius), Pose, meshGeom, meshPose, Results, 8192, startIndex, Overflow);
-		ASSERT(!Overflow);
-
-		NbTouchedTriangles += Nb;
-		overlaps++;
-	}
-	return NbTouchedTriangles;
-}
-
-udword PhysX::FindTriangles_MeshBoxOverlap(PintSQThreadContext context, PintObjectHandle handle, udword nb, const PintBoxOverlapData* overlaps)
-{
-	PxRigidActor* RigidActor = GetActorFromHandle(handle);
-	if(!RigidActor)
-		return 0;
-
-	if(RigidActor->getNbShapes()!=1)
-		return 0;
-
-	PxShape* meshShape = null;
-	RigidActor->getShapes(&meshShape, 1);
-	if(!meshShape)
-		return 0;
-
-	PxTriangleMeshGeometry meshGeom;
-	if(!meshShape->getTriangleMeshGeometry(meshGeom))
-		return 0;
-
-	const PxTransform meshPose = PxShapeExt::getGlobalPose(*meshShape);
-
-	PxU32 Results[8192];
-	udword NbTouchedTriangles = 0;
-	const PxU32 startIndex = 0;
-	while(nb--)
-	{
-		// ### add this as a helper
-		const Quat Q = overlaps->mBox.mRot;	// ### SIGH
-		const PxTransform Pose(ToPxVec3(overlaps->mBox.mCenter), ToPxQuat(Q));
-
-		bool Overflow = false;
-		PxU32 Nb = PxMeshQuery::findOverlapTriangleMesh(PxBoxGeometry(ToPxVec3(overlaps->mBox.mExtents)), Pose, meshGeom, meshPose, Results, 8192, startIndex, Overflow);
-		ASSERT(!Overflow);
-
-		NbTouchedTriangles += Nb;
-		overlaps++;
-	}
-	return NbTouchedTriangles;
-}
-
-udword PhysX::FindTriangles_MeshCapsuleOverlap(PintSQThreadContext context, PintObjectHandle handle, udword nb, const PintCapsuleOverlapData* overlaps)
-{
-	PxRigidActor* RigidActor = GetActorFromHandle(handle);
-	if(!RigidActor)
-		return 0;
-
-	if(RigidActor->getNbShapes()!=1)
-		return 0;
-
-	PxShape* meshShape = null;
-	RigidActor->getShapes(&meshShape, 1);
-	if(!meshShape)
-		return 0;
-
-	PxTriangleMeshGeometry meshGeom;
-	if(!meshShape->getTriangleMeshGeometry(meshGeom))
-		return 0;
-
-	const PxTransform meshPose = PxShapeExt::getGlobalPose(*meshShape);
-
-	PxU32 Results[8192];
-	udword NbTouchedTriangles = 0;
-	const PxU32 startIndex = 0;
-	while(nb--)
-	{
-		// ### refactor this!
-		const Point Center = (overlaps->mCapsule.mP0 + overlaps->mCapsule.mP1)*0.5f;
-		Point CapsuleAxis = overlaps->mCapsule.mP1 - overlaps->mCapsule.mP0;
-		const float M = CapsuleAxis.Magnitude();
-		CapsuleAxis /= M;
-		const PxQuat q = PxShortestRotation(PxVec3(1.0f, 0.0f, 0.0f), ToPxVec3(CapsuleAxis));
-
-		const PxTransform Pose(ToPxVec3(Center), q);
-
-		bool Overflow = false;
-		PxU32 Nb = PxMeshQuery::findOverlapTriangleMesh(PxCapsuleGeometry(overlaps->mCapsule.mRadius, M*0.5f), Pose, meshGeom, meshPose, Results, 8192, startIndex, Overflow);
-		ASSERT(!Overflow);
-
-		NbTouchedTriangles += Nb;
-		overlaps++;
-	}
-	return NbTouchedTriangles;
-}
-
-PR PhysX::GetWorldTransform(PintObjectHandle handle)
-{
-	return PhysX3::GetWorldTransform(handle);
-}
-
-void PhysX::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
+/*void PhysX::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
 {
 	PxRigidActor* RigidActor = GetActorFromHandle(handle);
 	if(!RigidActor)
@@ -1670,69 +856,67 @@ void PhysX::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_ty
 
 		PxRigidBodyExt::addForceAtPos(*RigidDynamic, ToPxVec3(action), ToPxVec3(pos), mode);
 	}
-}
+}*/
 
-udword PhysX::GetShapes(PintObjectHandle* shapes, PintObjectHandle handle)
+void PhysX::AddWorldImpulseAtWorldPos(PintObjectHandle handle, const Point& world_impulse, const Point& world_pos)
 {
-//	PxRigidActor* RigidActor = GetActorFromHandle(handle);
-	PxRigidActor* RigidActor = (PxRigidActor*)handle;
-	return RigidActor->getShapes((PxShape**)shapes, 3);
-}
-
-void PhysX::SetLocalRot(PintObjectHandle handle, const Quat& q)
-{
-//	PxShape* Shape = GetShapeFromHandle(handle);
-	PxShape* Shape = (PxShape*)handle;
-	PxTransform lp = Shape->getLocalPose();
-	lp.q = ToPxQuat(q);
-	Shape->setLocalPose(lp);
-}
-
-bool PhysX::GetConvexData(PintObjectHandle handle, PINT_CONVEX_CREATE& data)
-{
-	PxShape* Shape = GetShapeFromHandle(handle);
-	if(!Shape)
+	PxRigidActor* RigidActor = GetActorFromHandle(handle);
+	if(!RigidActor)
 	{
-		PxRigidActor* RigidActor = GetActorFromHandle(handle);
-		ASSERT(RigidActor);
-		udword NbShapes = RigidActor->getNbShapes();
-		if(NbShapes!=1)
-			return false;
-		RigidActor->getShapes(&Shape, 1);
+		PxShape* Shape = GetShapeFromHandle(handle);
+		ASSERT(Shape);
+		RigidActor = &Shape->getActor();
 	}
 
-	PxConvexMeshGeometry geometry;
-	if(!Shape->getConvexMeshGeometry(geometry))
-		return false;
-
-	data.mNbVerts	= geometry.convexMesh->getNbVertices();
-	data.mVerts		= (const Point*)geometry.convexMesh->getVertices();
-	return true;	
+	if(RigidActor->getConcreteType()==PxConcreteType::eRIGID_DYNAMIC)
+	{
+		PxRigidDynamic* RigidDynamic = static_cast<PxRigidDynamic*>(RigidActor);
+		PxRigidBodyExt::addForceAtPos(*RigidDynamic, ToPxVec3(world_impulse), ToPxVec3(world_pos), PxForceMode::eIMPULSE);
+	}
 }
 
-bool PhysX::SetKinematicPose(PintObjectHandle handle, const Point& pos)
+void PhysX::AddLocalTorque(PintObjectHandle handle, const Point& local_torque)
 {
-	PxRigidActor* Actor = GetActorFromHandle(handle);
-	if(!Actor)
-		return false;
+	PxRigidActor* RigidActor = GetActorFromHandle(handle);
+	if(!RigidActor)
+	{
+		PxShape* Shape = GetShapeFromHandle(handle);
+		ASSERT(Shape);
+		RigidActor = &Shape->getActor();
+	}
 
-	ASSERT(Actor->getConcreteType()==PxConcreteType::eRIGID_DYNAMIC);
-
-	PxRigidDynamic* Kine = static_cast<PxRigidDynamic*>(Actor);
-	Kine->setKinematicTarget(PxTransform(ToPxVec3(pos)));
-	return true;
+	if(RigidActor->getConcreteType()==PxConcreteType::eRIGID_DYNAMIC)
+	{
+		PxRigidDynamic* RigidDynamic = static_cast<PxRigidDynamic*>(RigidActor);
+		const PxVec3 GlobalTorque = RigidDynamic->getGlobalPose().rotate(ToPxVec3(local_torque));
+		RigidDynamic->addTorque(GlobalTorque, PxForceMode::eACCELERATION, true);
+	}
 }
 
 
 static PhysX* gPhysX = null;
-static void gPhysX_GetOptionsFromGUI();
+
+class MyUICallback : public UICallback
+{
+	public:
+	virtual	void			UIModificationCallback()
+	{
+		if(gPhysX)
+			gPhysX->UpdateFromUI();
+	}
+
+}gUICallback;
 
 void PhysX_Init(const PINT_WORLD_CREATE& desc)
 {
-	gPhysX_GetOptionsFromGUI();
+	PhysX3::GetOptionsFromGUI(desc.GetTestName());
+
+	for(PxU16 j=0;j<32;j++)
+		for(PxU16 i=0;i<32;i++)
+			PxSetGroupCollisionFlag(i, j, true);
 
 	ASSERT(!gPhysX);
-	gPhysX = ICE_NEW(PhysX);
+	gPhysX = ICE_NEW(PhysX)(PhysX3::GetEditableParams());
 	gPhysX->Init(desc);
 }
 
@@ -1752,6 +936,8 @@ PhysX* GetPhysX()
 }
 
 ///////////////////////////////////////////////////////////////////////////////
+
+#ifdef REMOVED
 
 static Container*	gPhysXGUI = null;
 static IceComboBox*	gComboBox_NbThreads = null;
@@ -1832,7 +1018,7 @@ static void gCheckBoxCallback(const IceCheckBox& check_box, bool checked, void* 
 			gUseCCD = checked;
 			break;
 		case PHYSX_GUI_SQ_FILTER_OUT:
-			gSQFilterOutAllShapes = checked;
+			mParams.mSQFilterOutAllShapes = checked;
 			break;
 		case PHYSX_GUI_SQ_INITIAL_OVERLAP:
 			gSQInitialOverlap = checked;
@@ -2006,7 +1192,7 @@ IceWindow* PhysX_InitGUI(IceWidget* parent, PintGUIHelper& helper)
 		helper.CreateCheckBox(Main, PHYSX_GUI_ENABLE_SQ, 4, y, CheckBoxWidth, 20, "Enable scene queries", gPhysXGUI, gSQFlag, gCheckBoxCallback);
 		y += YStepCB;
 
-		gCheckBox_SQ_FilterOutAllShapes = helper.CreateCheckBox(Main, PHYSX_GUI_SQ_FILTER_OUT, 4, y, CheckBoxWidth, 20, "Filter out all shapes (DEBUG)", gPhysXGUI, gSQFilterOutAllShapes, gCheckBoxCallback);
+		gCheckBox_SQ_FilterOutAllShapes = helper.CreateCheckBox(Main, PHYSX_GUI_SQ_FILTER_OUT, 4, y, CheckBoxWidth, 20, "Filter out all shapes (DEBUG)", gPhysXGUI, mParams.mSQFilterOutAllShapes, gCheckBoxCallback);
 		gCheckBox_SQ_FilterOutAllShapes->SetEnabled(gSQFlag);
 		y += YStepCB;
 
@@ -2177,6 +1363,19 @@ void PhysX_CloseGUI()
 	gCheckBox_SQ_InitialOverlap = null;
 	for(udword i=0;i<NB_DEBUG_VIZ_PARAMS;i++)
 		gCheckBox_DebugVis[i] = null;
+}
+#endif
+
+///////////////////////////////////////////////////////////////////////////////
+
+IceWindow* PhysX_InitGUI(IceWidget* parent, PintGUIHelper& helper)
+{
+	return PhysX3::InitSharedGUI(parent, helper, gUICallback, NB_DEBUG_VIZ_PARAMS, gDebugVizParams, gDebugVizNames);
+}
+
+void PhysX_CloseGUI()
+{
+	PhysX3::CloseSharedGUI();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

@@ -72,14 +72,6 @@
 		//
 		virtual	udword				FindTriangles_MeshSphereOverlap	(PintSQThreadContext context, PintObjectHandle handle, udword nb, const PintSphereOverlapData* overlaps);
 
-		virtual	PR					GetWorldTransform(PintObjectHandle handle);
-		virtual	void				ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos);
-
-		// XP
-		virtual	udword				GetShapes(PintObjectHandle* shapes, PintObjectHandle handle);
-		virtual	void				SetLocalRot(PintObjectHandle handle, const Quat& q);
-		virtual	bool				GetConvexData(PintObjectHandle handle, PINT_CONVEX_CREATE& data);
-
 		virtual	PintSQThreadContext	CreateSQThreadContext();
 		virtual	void				ReleaseSQThreadContext(PintSQThreadContext);
 		//~Pint

@@ -39,7 +39,17 @@
 		virtual	udword									BatchCapsuleSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintCapsuleSweepData* sweeps);
 
 		virtual	PR										GetWorldTransform(PintObjectHandle handle);
-		virtual	void									ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos);
+		virtual	void									SetWorldTransform(PintObjectHandle handle, const PR& pose);
+
+//		virtual	void									ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos);
+		virtual	void									AddWorldImpulseAtWorldPos(PintObjectHandle handle, const Point& world_impulse, const Point& world_pos);
+		virtual	void									AddLocalTorque(PintObjectHandle handle, const Point& local_torque);
+
+		virtual	Point									GetAngularVelocity(PintObjectHandle handle);
+		virtual	void									SetAngularVelocity(PintObjectHandle handle, const Point& angular_velocity);
+
+		virtual	float									GetMass(PintObjectHandle handle);
+		virtual	Point									GetLocalInertia(PintObjectHandle handle);
 
 		virtual	udword									CreateConvexObject(const PINT_CONVEX_DATA_CREATE& desc);
 		virtual	udword									BatchConvexSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintConvexSweepData* sweeps);
@@ -66,6 +76,7 @@
 					btTriangleInfoMap*			mTriangleInfoMap;
 				};
 
+				std::vector<btTypedConstraint*>			mConstraints;
 				std::vector<btCollisionShape*>			mCollisionShapes;
 				std::vector<btSphereShape*>				mSphereShapes;
 				std::vector<InternalBoxShape>			mBoxShapes;

@@ -18,11 +18,29 @@
 				IndexedSurface*	CreateManagedSurface();
 				void			ReleaseManagedSurfaces();
 
-		inline_	udword			GetNbSurfaces()				const			{ return mSurfaces.GetNbEntries();					}
-		inline_	IndexedSurface*	GetFirstSurface()			const			{ return (IndexedSurface*)mSurfaces.GetEntry(0);	}
-		inline_	IndexedSurface*	GetSurface(udword i)		const			{ return (IndexedSurface*)mSurfaces.GetEntry(i);	}
+		inline_	udword			GetNbSurfaces()				const
+								{
+									return mSurfaces.GetNbEntries();
+								}
 
-		inline_	void			SetGlobalBounds(const AABB& global_bounds)	{ mGlobalBounds = global_bounds;	}
+		inline_	IndexedSurface*	GetFirstSurface()			const
+								{
+									if(!mSurfaces.GetNbEntries())
+										return null;
+									return (IndexedSurface*)mSurfaces.GetEntry(0);
+								}
+
+		inline_	IndexedSurface*	GetSurface(udword i)		const
+								{
+									if(i>=mSurfaces.GetNbEntries())
+										return null;
+									return (IndexedSurface*)mSurfaces.GetEntry(i);
+								}
+
+		inline_	void			SetGlobalBounds(const AABB& global_bounds)
+								{
+									mGlobalBounds = global_bounds;
+								}
 
 		inline_	void			GetGlobalBounds(Point& center, Point& extents)
 								{

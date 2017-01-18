@@ -12,25 +12,6 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static			udword									gNbThreads				= 0;
-static	const	bool									gUseCustomMemory		= true;
-static			hkpRigidBodyCinfo::SolverDeactivation	gSolverDeactivation		= hkpRigidBodyCinfo::SOLVER_DEACTIVATION_MEDIUM;
-static			hkpWorldCinfo::BroadPhaseType			gBroadPhaseType			= hkpWorldCinfo::BROADPHASE_TYPE_HYBRID;
-static			hkpWorldCinfo::ContactPointGeneration	gContactPointGeneration	= hkpWorldCinfo::CONTACT_POINT_REJECT_MANY;
-static			HavokMeshFormat							gMeshFormat				= HAVOK_BV_COMPRESSED_MESH_SHAPE;
-static			bool									gEnableSleeping			= false;
-static			float									gLinearDamping			= 0.1f;
-static			float									gAngularDamping			= 0.05f;
-static			float									gCollisionTolerance		= 0.05f;
-static			float									gGlobalBoxSize			= 10000.0f;
-static			float									gMaxLinearVelocity		= 10000.0f;
-static			bool									gShareShapes			= true;
-static			udword									gSolverIterationCount	= 4;
-static			bool									gUseVDB					= false;
-static			bool									gUseCCD					= false;
-
-///////////////////////////////////////////////////////////////////////////////
-
 #include <Physics/Collide/Shape/Query/hkpRayHitCollector.h>
 #include <Physics/Collide/Query/CastUtil/hkpWorldRayCastOutput.h>
 #include <Common/Base/Algorithm/Sort/hkSort.h>
@@ -133,36 +114,31 @@ static void HK_CALL errorReport(const char* msg, void*)
 	printf("HAVOK message: %s", msg);
 }
 
-Havok::Havok() :
-	mMemoryRouter	(null),
-	mStackBuffer	(null),
-	mThreadPool		(null),
-	mJobQueue		(null),
-	mPhysicsWorld	(null),
-	mContext		(null),
-	mVdb			(null)
+Havok::Havok(const EditableParams& params) :
+	SharedHavok		(params),
+	mThreadPool		(null)
 {
 }
 
 Havok::~Havok()
 {
-	ASSERT(!mVdb);
-	ASSERT(!mContext);
-	ASSERT(!mPhysicsWorld);
-	ASSERT(!mJobQueue);
 	ASSERT(!mThreadPool);
-	ASSERT(!mStackBuffer);
-	ASSERT(!mMemoryRouter);
 }
 
 void Havok::GetCaps(PintCaps& caps) const
 {
 	caps.mSupportRigidBodySimulation	= true;
+	caps.mSupportCylinders				= true;
+	caps.mSupportMassForInertia			= true;
 	caps.mSupportKinematics				= true;
 	caps.mSupportCollisionGroups		= true;
 	caps.mSupportCompounds				= true;
 	caps.mSupportConvexes				= true;
 	caps.mSupportMeshes					= true;
+#ifdef SUPPORT_HAVOK_ARTICULATION
+//	caps.mSupportArticulations			= true;
+	caps.mSupportArticulations			= false;	// Currently disabled because support is incomplete and it crashes in some scenes
+#endif
 	caps.mSupportSphericalJoints		= true;
 	caps.mSupportHingeJoints			= true;
 	caps.mSupportFixedJoints			= true;
@@ -174,9 +150,6 @@ void Havok::GetCaps(PintCaps& caps) const
 	caps.mSupportCapsuleSweeps			= true;
 	caps.mSupportConvexSweeps			= true;
 	caps.mSupportSphereOverlaps			= true;
-	caps.mSupportBoxOverlaps			= false;
-	caps.mSupportCapsuleOverlaps		= false;
-	caps.mSupportConvexOverlaps			= false;
 }
 
 #ifdef REMOVED
@@ -502,11 +475,7 @@ void Havok::Init(const PINT_WORLD_CREATE& desc)
 
 
 //	mThreadMemory = new hkThreadMemory(memoryManager);
-//	mMemoryRouter = hkMemoryInitUtil::initDefault( hkMallocAllocator::m_defaultMallocAllocator, hkMemorySystem::FrameInfo( 500 * 1024 ) );
-//	mMemoryRouter = hkMemoryInitUtil::initDefault( hkMallocAllocator::m_defaultMallocAllocator, hkMemorySystem::FrameInfo( 1024 * 1024 ) );
-	mMemoryRouter = hkMemoryInitUtil::initDefault( hkMallocAllocator::m_defaultMallocAllocator, hkMemorySystem::FrameInfo( 2 * 1024 * 1024 ) );
-//	mMemoryRouter = hkMemoryInitUtil::initDefault( hkMallocAllocator::m_defaultMallocAllocator, hkMemorySystem::FrameInfo( 4 * 1024 * 1024 ) );
-//	mMemoryRouter = hkMemoryInitUtil::initDefault( hkMallocAllocator::m_defaultMallocAllocator, hkMemorySystem::FrameInfo( 0 ) );
+	mMemoryRouter = hkMemoryInitUtil::initDefault( hkMallocAllocator::m_defaultMallocAllocator, hkMemorySystem::FrameInfo(mParams.mSolverBufferSize * 1024));
 
 //	hkBaseSystem::init(memoryManager, mThreadMemory, errorReport);
 	hkBaseSystem::init( mMemoryRouter, errorReport );
@@ -522,7 +491,7 @@ void Havok::Init(const PINT_WORLD_CREATE& desc)
 		hkThreadMemory::getInstance().setStackArea(mStackBuffer, stackSize);
 	}*/
 
-	if(gNbThreads>=2)
+	if(mParams.mNbThreads>=2)
 	{
 		//
 		// Initialize the multi-threading classes, hkJobQueue, and hkJobThreadPool
@@ -542,7 +511,7 @@ void Havok::Init(const PINT_WORLD_CREATE& desc)
 
 		// We can cap the number of threads used - here we use the maximum for whatever multithreaded platform we are running on. This variable is
 		// set in the following code sections.
-		int totalNumThreadsUsed = gNbThreads;
+		int totalNumThreadsUsed = mParams.mNbThreads;
 
 		// Get the number of physical threads available on the system
 /*		hkHardwareInfo hwInfo;
@@ -576,7 +545,7 @@ void Havok::Init(const PINT_WORLD_CREATE& desc)
 	// <PHYSICS-ONLY>: Create the physics world.
 	// At this point you would initialize any other Havok modules you are using.
 	//
-	{
+/*	{
 		// The world cinfo contains global simulation parameters, including gravity, solver settings etc.
 		hkpWorldCinfo worldInfo;
 
@@ -590,23 +559,24 @@ void Havok::Init(const PINT_WORLD_CREATE& desc)
 		}
 		else
 		{
-			worldInfo.m_broadPhaseWorldAabb = hkAabb(hkVector4(-gGlobalBoxSize, -gGlobalBoxSize, -gGlobalBoxSize), hkVector4(gGlobalBoxSize, gGlobalBoxSize, gGlobalBoxSize));
+			const float Size = mParams.mGlobalBoxSize;
+			worldInfo.m_broadPhaseWorldAabb = hkAabb(hkVector4(-Size, -Size, -Size), hkVector4(Size, Size, Size));
 		}
-		worldInfo.m_broadPhaseType = gBroadPhaseType;
-		worldInfo.m_contactPointGeneration = gContactPointGeneration;
+		worldInfo.m_broadPhaseType = mParams.mBroadPhaseType;
+		worldInfo.m_contactPointGeneration = mParams.mContactPointGeneration;
 
 		worldInfo.m_gravity = ToHkVector4(desc.mGravity);
 
-		worldInfo.m_solverIterations = gSolverIterationCount;
+		worldInfo.m_solverIterations = mParams.mSolverIterationCount;
 
 		// Set the simulation type of the world to multi-threaded.
-		if(gNbThreads>=2)
+		if(mParams.mNbThreads>=2)
 		{
 			worldInfo.m_simulationType = hkpWorldCinfo::SIMULATION_TYPE_MULTITHREADED;
 		}
 		else
 		{
-			if(gUseCCD)
+			if(mParams.mUseCCD)
 			{
 				worldInfo.m_simulationType = hkpWorldCinfo::SIMULATION_TYPE_CONTINUOUS;
 				worldInfo.m_sizeOfToiEventQueue = 1024;
@@ -618,14 +588,14 @@ void Havok::Init(const PINT_WORLD_CREATE& desc)
 		// Flag objects that fall "out of the world" to be automatically removed - just necessary for this physics scene
 		worldInfo.m_broadPhaseBorderBehaviour = hkpWorldCinfo::BROADPHASE_BORDER_REMOVE_ENTITY;
 
-		worldInfo.m_enableDeactivation = gEnableSleeping;
+		worldInfo.m_enableDeactivation = mParams.mEnableSleeping;
 
-		worldInfo.m_collisionTolerance = gCollisionTolerance;
+		worldInfo.m_collisionTolerance = mParams.mCollisionTolerance;
 
 		mPhysicsWorld = new hkpWorld(worldInfo);
 
 		// Disable deactivation, so that you can view timers in the VDB. This should not be done in your game.
-		mPhysicsWorld->m_wantDeactivation = gEnableSleeping;
+		mPhysicsWorld->m_wantDeactivation = mParams.mEnableSleeping;
 
 
 		// When the simulation type is SIMULATION_TYPE_MULTITHREADED, in the debug build, the sdk performs checks
@@ -644,9 +614,10 @@ void Havok::Init(const PINT_WORLD_CREATE& desc)
 
 		// Now we have finished modifying the world, release our write marker.
 		mPhysicsWorld->unmarkForWrite();
-	}
+	}*/
+	mPhysicsWorld = SetupWorld(desc, mJobQueue);
 
-	if(gUseVDB)
+	if(mParams.mUseVDB)
 	{
 		//
 		// Initialize the VDB
@@ -766,7 +737,7 @@ udword Havok::Update(float timestep)
 	// Step the physics world. This single call steps using this thread and all threads
 	// in the threadPool. For other products you add jobs, call process all jobs and wait for completion.
 	// See the multithreading chapter in the user guide for details
-	if(gNbThreads>=2)
+	if(mParams.mNbThreads>=2)
 	{
 		mPhysicsWorld->stepMultithreaded(mJobQueue, mThreadPool, timestep);
 	}
@@ -816,679 +787,12 @@ udword Havok::Update(float timestep)
 		return TotalSize;
 	}*/
 
-	hkMemoryAllocator::MemoryStatistics Stats;
-	hkMemorySystem::getInstance().getHeapStatistics(Stats);
-//	return Stats.m_allocated;
-	return Stats.m_inUse;
-//	return 0;
-}
-
-static void DrawLeafShape(PintRender& renderer, const hkpShape* shape, const PR& pose)
-{
-	ASSERT(shape->getUserData());
-	if(shape->getUserData())
-	{
-		PintShapeRenderer* psr = (PintShapeRenderer*)shape->getUserData();
-		psr->Render(pose);
-//		return;
-	}
-
-/*	const hkpShapeType Type = shape->getType();
-
-	if(Type==hkcdShapeType::SPHERE)
-	{
-		const hkpSphereShape* SphereShape = static_cast<const hkpSphereShape*>(shape);
-		const float Radius = SphereShape->getRadius();
-		renderer.DrawSphere(Radius, pose);
-	}
-	else if(Type==hkcdShapeType::BOX)
-	{
-		const hkpBoxShape* BoxShape = static_cast<const hkpBoxShape*>(shape);
-		const hkVector4& Extents = BoxShape->getHalfExtents();
-		renderer.DrawBox(ToPoint(Extents), pose);
-	}
-	else if(Type==hkcdShapeType::CONVEX_VERTICES)
-	{
-		const hkpConvexVerticesShape* ConvexShape = static_cast<const hkpConvexVerticesShape*>(shape);
-		ASSERT(0);
-	}
-	else ASSERT(0);*/
+	return Havok_GetAllocatedMemory();
 }
 
 Point Havok::GetMainColor()
 {
-	return Point(0.0f, 0.0f, 1.0f);
-}
-
-void Havok::Render(PintRender& renderer)
-{
-	const udword Size = mRigidBodies.GetNbEntries();
-	for(udword i=0;i<Size;i++)
-	{
-		hkpRigidBody* rigidBody = (hkpRigidBody*)mRigidBodies[i];
-
-		rigidBody->markForRead();
-
-		const hkTransform& BodyPose = rigidBody->getTransform();
-
-		const hkpCollidable* collidable = rigidBody->getCollidable();
-		const hkpShape* shape = collidable->getShape();
-		const hkpShapeType type = shape->getType();
-		if(type==hkcdShapeType::LIST)
-		{
-			const hkpListShape* listShape = static_cast<const hkpListShape*>(shape);
-			const int NbShapes = listShape->getNumChildShapes();
-			for(int j=0;j<NbShapes;j++)
-			{
-				const hkpShape* ChildShape = listShape->getChildShapeInl(j);
-				const hkpShapeType ChildShapeType = ChildShape->getType();
-				if(ChildShapeType==hkcdShapeType::CONVEX_TRANSFORM)
-				{
-					const hkpConvexTransformShape* ConvexTransformShape = static_cast<const hkpConvexTransformShape*>(ChildShape);
-					const hkpConvexShape* LeafShape = ConvexTransformShape->getChildShape();
-					hkTransform LeafTransform;
-					ConvexTransformShape->getTransform(&LeafTransform);
-
-					hkTransform Combo;
-					Combo.setMul(BodyPose, LeafTransform);
-
-					DrawLeafShape(renderer, LeafShape, ToPR(Combo));
-				}
-				else ASSERT(0);
-			}
-		}
-		else
-		{
-			DrawLeafShape(renderer, shape, ToPR(BodyPose));
-		}
-
-		rigidBody->unmarkForRead();
-	}
-}
-
-hkpRigidBody* Havok::CreateObject(const hkpRigidBodyCinfo& info, const PINT_OBJECT_CREATE& create, hkpShape* shape)
-{
-	hkpRigidBody* rigidBody = new hkpRigidBody(info);
-
-	if(create.mAddToWorld)
-	{
-		mPhysicsWorld->markForWrite();
-		mPhysicsWorld->addEntity(rigidBody);
-		mPhysicsWorld->unmarkForWrite();
-		rigidBody->removeReference();
-	}
-
-	shape->removeReference();
-
-	if(info.m_motionType != hkpMotion::MOTION_FIXED)
-	{
-		rigidBody->markForWrite();
-		rigidBody->setMaxLinearVelocity(gMaxLinearVelocity);
-		rigidBody->setLinearVelocity(ToHkVector4(create.mLinearVelocity));
-		rigidBody->setAngularVelocity(ToHkVector4(create.mAngularVelocity));
-		rigidBody->unmarkForWrite();
-	}
-
-	mRigidBodies.Add(udword(rigidBody));
-
-//	hkReal pd = rigidBody->getAllowedPenetrationDepth();
-
-//	rigidBody->setDeactivator( hkpRigidBodyCinfo::DEACTIVATOR_NEVER );
-
-	return rigidBody;
-}
-
-bool Havok::ReleaseObject(PintObjectHandle handle)
-{
-	hkpRigidBody* rigidBody = (hkpRigidBody*)handle;
-	mRigidBodies.Delete(udword(handle));
-		mPhysicsWorld->markForWrite();
-//int test0 = rigidBody->getReferenceCount();
-		hkBool Status = mPhysicsWorld->removeEntity(rigidBody);
-//int test1 = rigidBody->getReferenceCount();
-		ASSERT(Status);
-		mPhysicsWorld->unmarkForWrite();
-//	DELETESINGLE(rigidBody);
-//rigidBody->removeReference();
-//int test2 = rigidBody->getReferenceCount();
-	return true;
-}
-
-static void FillRigidBodyInfo(hkpRigidBodyCinfo& info, const PINT_OBJECT_CREATE& desc, hkpShape* shape)
-{
-	info.m_shape				= shape;
-	info.m_position				= ToHkVector4(desc.mPosition);
-	info.m_rotation				= ToHkQuaternion(desc.mRotation);
-	info.m_solverDeactivation	= gSolverDeactivation;
-	info.m_collisionFilterInfo	= hkpGroupFilter::calcFilterInfo(desc.mCollisionGroup);
-	if(desc.mMass!=0.0f)
-	{
-		info.m_linearDamping	= gLinearDamping;
-		info.m_angularDamping	= gAngularDamping;
-
-		if(gUseCCD)
-//			info.m_qualityType		= HK_COLLIDABLE_QUALITY_DEBRIS_SIMPLE_TOI;
-//			info.m_qualityType		= HK_COLLIDABLE_QUALITY_DEBRIS;
-			info.m_qualityType		= HK_COLLIDABLE_QUALITY_BULLET;
-//			info.m_qualityType		= HK_COLLIDABLE_QUALITY_CRITICAL;
-
-		if(desc.mKinematic)
-			info.m_motionType		= hkpMotion::MOTION_KEYFRAMED;
-	}
-	else
-	{
-		info.m_qualityType		= HK_COLLIDABLE_QUALITY_FIXED;
-		info.m_motionType		= hkpMotion::MOTION_FIXED;
-	}
-//	info.m_enableDeactivation	= false;
-}
-
-PintObjectHandle Havok::CreateObject(const PINT_OBJECT_CREATE& desc)
-{
-	udword NbShapes = desc.GetNbShapes();
-	if(!NbShapes)
-		return null;
-	if(NbShapes>1)
-		return CreateCompoundObject(desc);
-
-	if(desc.mShapes->mType==PINT_SHAPE_SPHERE)
-	{
-		const PINT_SPHERE_CREATE* SphereCreate = static_cast<const PINT_SPHERE_CREATE*>(desc.mShapes);
-
-		hkpSphereShape* shape = FindSphereShape(gShareShapes, mSphereShapes, *SphereCreate);
-
-		hkpRigidBodyCinfo info;
-		if(desc.mMass!=0.0f)
-		{
-			hkMassProperties massProperties;
-			hkpInertiaTensorComputer::computeSphereVolumeMassProperties(SphereCreate->mRadius, desc.mMass, massProperties);
-
-			info.m_mass				= massProperties.m_mass;
-			info.m_centerOfMass		= massProperties.m_centerOfMass;
-			info.m_inertiaTensor	= massProperties.m_inertiaTensor;
-			info.m_motionType		= hkpMotion::MOTION_SPHERE_INERTIA;
-		//	info.m_motionType		= hkpMotion::MOTION_BOX_INERTIA;
-		}
-		FillRigidBodyInfo(info, desc, shape);
-
-		if(SphereCreate->mMaterial)
-		{
-			info.m_friction		= SphereCreate->mMaterial->mDynamicFriction;
-			info.m_restitution	= SphereCreate->mMaterial->mRestitution;
-		}
-		else
-		{
-			info.m_friction		= 0.5f;
-			info.m_restitution	= 0.0f;
-		}
-
-		return CreateObject(info, desc, shape);
-	}
-	else if(desc.mShapes->mType==PINT_SHAPE_BOX)
-	{
-		const PINT_BOX_CREATE* BoxCreate = static_cast<const PINT_BOX_CREATE*>(desc.mShapes);
-
-		const hkVector4 halfExtents = ToHkVector4(BoxCreate->mExtents);
-
-		hkpBoxShape* shape = FindBoxShape(gShareShapes, mBoxShapes, *BoxCreate);
-
-		hkpRigidBodyCinfo info;
-//		info.m_allowedPenetrationDepth = 1.0f;
-		if(desc.mMass!=0.0f)
-		{
-			hkMassProperties massProperties;
-			hkpInertiaTensorComputer::computeBoxVolumeMassProperties(halfExtents, desc.mMass, massProperties);
-
-			info.m_mass				= massProperties.m_mass;
-			info.m_centerOfMass		= massProperties.m_centerOfMass;
-			info.m_inertiaTensor	= massProperties.m_inertiaTensor;
-			info.m_motionType		= hkpMotion::MOTION_BOX_INERTIA;
-//			info.m_motionType		= hkpMotion::MOTION_SPHERE_INERTIA;
-		}
-		FillRigidBodyInfo(info, desc, shape);
-
-		if(BoxCreate->mMaterial)
-		{
-			info.m_friction		= BoxCreate->mMaterial->mDynamicFriction;
-			info.m_restitution	= BoxCreate->mMaterial->mRestitution;
-		}
-		else
-		{
-			info.m_friction		= 0.5f;
-			info.m_restitution	= 0.0f;
-		}
-
-		return CreateObject(info, desc, shape);
-	}
-	else if(desc.mShapes->mType==PINT_SHAPE_CAPSULE)
-	{
-		const PINT_CAPSULE_CREATE* CapsuleCreate = static_cast<const PINT_CAPSULE_CREATE*>(desc.mShapes);
-
-		hkpCapsuleShape* shape = FindCapsuleShape(gShareShapes, mCapsuleShapes, *CapsuleCreate);
-
-		hkpRigidBodyCinfo info;
-//		info.m_allowedPenetrationDepth = 1.0f;
-		if(desc.mMass!=0.0f)
-		{
-			const hkVector4 vectorA(0.0f, CapsuleCreate->mHalfHeight, 0.0f);
-			const hkVector4 vectorB(0.0f, -CapsuleCreate->mHalfHeight, 0.0f);
-
-			hkMassProperties massProperties;
-			hkpInertiaTensorComputer::computeCapsuleVolumeMassProperties(vectorA, vectorB, CapsuleCreate->mRadius, desc.mMass, massProperties);
-
-			info.m_mass				= massProperties.m_mass;
-			info.m_centerOfMass		= massProperties.m_centerOfMass;
-			info.m_inertiaTensor	= massProperties.m_inertiaTensor;
-			info.m_motionType		= hkpMotion::MOTION_DYNAMIC;
-		}
-		FillRigidBodyInfo(info, desc, shape);
-
-		if(CapsuleCreate->mMaterial)
-		{
-			info.m_friction		= CapsuleCreate->mMaterial->mDynamicFriction;
-			info.m_restitution	= CapsuleCreate->mMaterial->mRestitution;
-		}
-		else
-		{
-			info.m_friction		= 0.5f;
-			info.m_restitution	= 0.0f;
-		}
-
-		return CreateObject(info, desc, shape);
-	}
-	else if(desc.mShapes->mType==PINT_SHAPE_CONVEX)
-	{
-		const PINT_CONVEX_CREATE* ConvexCreate = static_cast<const PINT_CONVEX_CREATE*>(desc.mShapes);
-
-		hkStridedVertices StridedVerts;
-		StridedVerts.m_numVertices	= ConvexCreate->mNbVerts;
-		StridedVerts.m_striding		= sizeof(Point);
-		StridedVerts.m_vertices		= &ConvexCreate->mVerts->x;
-
-		hkpConvexVerticesShape* shape = FindConvexShape(gShareShapes, mConvexShapes, *ConvexCreate, StridedVerts);
-
-		hkpRigidBodyCinfo info;
-		if(desc.mMass!=0.0f)
-		{
-			hkMassProperties massProperties;
-			hkpInertiaTensorComputer::computeConvexHullMassProperties(StridedVerts, 0.0f, massProperties);
-
-			info.m_mass				= massProperties.m_mass;
-			info.m_centerOfMass		= massProperties.m_centerOfMass;
-			info.m_inertiaTensor	= massProperties.m_inertiaTensor;
-			info.m_motionType		= hkpMotion::MOTION_DYNAMIC;
-		}
-		FillRigidBodyInfo(info, desc, shape);
-
-		if(ConvexCreate->mMaterial)
-		{
-			info.m_friction		= ConvexCreate->mMaterial->mDynamicFriction;
-			info.m_restitution	= ConvexCreate->mMaterial->mRestitution;
-		}
-		else
-		{
-			info.m_friction		= 0.5f;
-			info.m_restitution	= 0.0f;
-		}
-
-		return CreateObject(info, desc, shape);
-	}
-	else if(desc.mShapes->mType==PINT_SHAPE_MESH)
-	{
-		const PINT_MESH_CREATE* MeshCreate = static_cast<const PINT_MESH_CREATE*>(desc.mShapes);
-
-		hkpShape* shape = CreateMeshShape(*MeshCreate, gMeshFormat, mMeshes, MeshCreate->mRenderer);
-
-//		if(MeshCreate->mRenderer)
-//			shape->setUserData(hkUlong(MeshCreate->mRenderer));
-
-		hkpRigidBodyCinfo info;
-		if(desc.mMass!=0.0f)
-		{
-			ASSERT(0);
-		}
-		FillRigidBodyInfo(info, desc, shape);
-
-		if(MeshCreate->mMaterial)
-		{
-			info.m_friction		= MeshCreate->mMaterial->mDynamicFriction;
-			info.m_restitution	= MeshCreate->mMaterial->mRestitution;
-		}
-		else
-		{
-			info.m_friction		= 0.5f;
-			info.m_restitution	= 0.0f;
-		}
-
-		return CreateObject(info, desc, shape);
-	}
-	else ASSERT(0);
-	return null;
-}
-
-PintObjectHandle Havok::CreateCompoundObject(const PINT_OBJECT_CREATE& desc)
-{
-	// We'll basically have to create a 'List' Shape  (ie. a hkpListShape) in order to have many
-	// shapes in the same body. Each element of the list will be a (transformed) hkpShape, ie.
-	// a hkpTransformShape (which basically is a (geometry,transformation) pair).
-	// The hkpListShape constructor needs a pointer to an array of hkShapes, so we create an array here, and push
-	// back the hkTransformShapes as we create them.
-	hkInplaceArray<hkpShape*, 32> shapeArray;
-	hkInplaceArray<hkpShape*, 32> refs;
-
-	const PINT_SHAPE_CREATE* CurrentShape = desc.mShapes;
-	while(CurrentShape)
-	{
-		ASSERT(!CurrentShape->mMaterial);
-
-		hkTransform LocalPose;
-		LocalPose.setTranslation(ToHkVector4(CurrentShape->mLocalPos));
-		LocalPose.setRotation(ToHkQuaternion(CurrentShape->mLocalRot));
-
-		if(CurrentShape->mType==PINT_SHAPE_SPHERE)
-		{
-			const PINT_SPHERE_CREATE* SphereCreate = static_cast<const PINT_SPHERE_CREATE*>(CurrentShape);
-
-			hkpSphereShape* shape = FindSphereShape(gShareShapes, mSphereShapes, *SphereCreate);
-			refs.pushBack(shape);
-
-//			sphere->addReference();
-			hkpConvexTransformShape* sphereTransform = new hkpConvexTransformShape(shape, LocalPose);
-			ASSERT(sphereTransform);
-			shapeArray.pushBack(sphereTransform);
-		}
-		else if(CurrentShape->mType==PINT_SHAPE_BOX)
-		{
-			const PINT_BOX_CREATE* BoxCreate = static_cast<const PINT_BOX_CREATE*>(CurrentShape);
-
-//			const hkVector4 halfExtents(ToHkVector4(BoxCreate->mExtents));
-
-			hkpBoxShape* shape = FindBoxShape(gShareShapes, mBoxShapes, *BoxCreate);
-			refs.pushBack(shape);
-
-//			sphere->addReference();
-			hkpConvexTransformShape* boxTransform = new hkpConvexTransformShape(shape, LocalPose);
-			ASSERT(boxTransform);
-			shapeArray.pushBack(boxTransform);
-		}
-		else if(CurrentShape->mType==PINT_SHAPE_CAPSULE)
-		{
-			const PINT_CAPSULE_CREATE* CapsuleCreate = static_cast<const PINT_CAPSULE_CREATE*>(CurrentShape);
-
-			hkpCapsuleShape* shape = FindCapsuleShape(gShareShapes, mCapsuleShapes, *CapsuleCreate);
-			refs.pushBack(shape);
-
-//			sphere->addReference();
-			hkpConvexTransformShape* capsuleTransform = new hkpConvexTransformShape(shape, LocalPose);
-			ASSERT(capsuleTransform);
-			shapeArray.pushBack(capsuleTransform);
-		}
-		else if(CurrentShape->mType==PINT_SHAPE_CONVEX)
-		{
-			const PINT_CONVEX_CREATE* ConvexCreate = static_cast<const PINT_CONVEX_CREATE*>(CurrentShape);
-
-			hkStridedVertices StridedVerts;
-			StridedVerts.m_numVertices	= ConvexCreate->mNbVerts;
-			StridedVerts.m_striding		= sizeof(Point);
-			StridedVerts.m_vertices		= &ConvexCreate->mVerts->x;
-
-			hkpConvexVerticesShape* shape = FindConvexShape(gShareShapes, mConvexShapes, *ConvexCreate, StridedVerts);
-			refs.pushBack(shape);
-
-//			sphere->addReference();
-			hkpConvexTransformShape* convexTransform = new hkpConvexTransformShape(shape, LocalPose);
-			ASSERT(convexTransform);
-			shapeArray.pushBack(convexTransform);
-		}
-		else ASSERT(0);
-
-		CurrentShape = CurrentShape->mNext;
-	}
-
-
-	// Now we can create the compound body as a hkpListShape
-
-	hkpListShape* listShape;
-	{
-		listShape = new hkpListShape(shapeArray.begin(), shapeArray.getSize());
-		for(int i=0; i<refs.getSize(); ++i)
-			refs[i]->removeReference();
-
-		for(int i=0; i<shapeArray.getSize(); ++i)
-			shapeArray[i]->removeReference();
-	}
-
-	// Create the rigid body
-	hkpRigidBodyCinfo info;
-	if(desc.mMass!=0.0f)
-	{
-		// #######
-		hkMassProperties massProperties;
-		hkpInertiaTensorComputer::computeBoxVolumeMassProperties(hkVector4(1.0f, 1.0f, 1.0f), desc.mMass, massProperties);
-
-		info.m_mass				= massProperties.m_mass;
-		info.m_centerOfMass		= massProperties.m_centerOfMass;
-		info.m_inertiaTensor	= massProperties.m_inertiaTensor;
-		info.m_motionType		= hkpMotion::MOTION_DYNAMIC;
-	}
-	else
-	{
-		info.m_restitution		= 0.0f;
-	}
-	FillRigidBodyInfo(info, desc, listShape);
-
-	return CreateObject(info, desc, listShape);
-}
-
-/*
-#include <Common/Internal/ConvexHull/hkGeometryUtility.h>
-hkpRigidBody* CreateRandomConvexGeometricFromBox(const hkVector4& size, const hkReal mass, const hkVector4& position, const int numVertices, BasicRandom& rnd)
-{
-	// generate a random convex geometry
-	hkArray<hkVector4> vertices;
-	{
-		hkVector4 halfExtents; halfExtents.setMul4( 0.5f, size );
-		vertices.reserve( numVertices );
-		for( int i = 0; i < numVertices; i++ )
-		{
-			hkVector4 xyz;
-			{
-				xyz(0) = rnd.randomFloat();
-				xyz(1) = rnd.randomFloat();
-				xyz(2) = rnd.randomFloat();
-				xyz(3) = 0.0f;
-			}
-			xyz.normalize3();
-			xyz(0) *= halfExtents(0);
-			xyz(1) *= halfExtents(1);
-			xyz(2) *= halfExtents(2);
-
-			vertices.pushBack( xyz );
-		}
-	}
-
-	// convert it to a convex vertices shape
-	hkpConvexVerticesShape* cvs = new hkpConvexVerticesShape(vertices);
-	
-	hkpRigidBodyCinfo convexInfo;
-
-	convexInfo.m_shape = cvs;
-	if(mass != 0.0f)
-	{
-		convexInfo.m_mass = mass;
-		hkpInertiaTensorComputer::setShapeVolumeMassProperties(convexInfo.m_shape, convexInfo.m_mass, convexInfo);
-		convexInfo.m_motionType = hkpMotion::MOTION_BOX_INERTIA;
-	}
-	else
-	{
-		convexInfo.m_motionType = hkpMotion::MOTION_FIXED;
-	}
-
-	convexInfo.m_rotation.setIdentity();
-	convexInfo.m_position = position;
-
-	hkpRigidBody* convexRigidBody = new hkpRigidBody(convexInfo);
-
-	cvs->removeReference();
-
-	return convexRigidBody;
-}*/
-
-PintJointHandle Havok::CreateJoint(const PINT_JOINT_CREATE& desc)
-{
-	ASSERT(mPhysicsWorld);
-
-	hkpRigidBody* body0 = (hkpRigidBody*)desc.mObject0;
-	hkpRigidBody* body1 = (hkpRigidBody*)desc.mObject1;
-
-	hkpConstraintInstance* constraint = null;
-	hkpConstraintData* data = null;
-
-	switch(desc.mType)
-	{
-		case PINT_JOINT_SPHERICAL:
-		{
-			const PINT_SPHERICAL_JOINT_CREATE& jc = static_cast<const PINT_SPHERICAL_JOINT_CREATE&>(desc);
-
-			if(1)
-			{
-				hkpBallAndSocketConstraintData* bsc = new hkpBallAndSocketConstraintData();
-				bsc->setInBodySpace(ToHkVector4(jc.mLocalPivot0), ToHkVector4(jc.mLocalPivot1));
-
-				constraint = new hkpConstraintInstance(body0, body1, bsc);
-				data = bsc;
-			}
-			else
-			{
-/*				hkpBallSocketChainData* chainData = new hkpBallSocketChainData();
-				hkpConstraintChainInstance* chainInstance = new hkpConstraintChainInstance( chainData );
-
-				chainInstance->addEntity( entities[0] );
-				for (int e = 1; e < entities.getSize(); e++)
-				{
-					chainData->addConstraintInfoInBodySpace( hkVector4(elemHalfSize, 0.0f, 0.0f), hkVector4( -elemHalfSize, 0.0f, 0.0f) );
-					chainInstance->addEntity( entities[e] );
-				}
-				chainData->removeReference();
-
-				m_world->addConstraint(chainInstance);
-				chainInstance->removeReference();*/
-			}
-		}
-		break;
-
-		case PINT_JOINT_HINGE:
-		{
-			const PINT_HINGE_JOINT_CREATE& jc = static_cast<const PINT_HINGE_JOINT_CREATE&>(desc);
-
-			if(jc.mMinLimitAngle!=MIN_FLOAT || jc.mMaxLimitAngle!=MAX_FLOAT)
-			{
-				hkpLimitedHingeConstraintData* lhc = new hkpLimitedHingeConstraintData();
-
-				if(!jc.mGlobalAnchor.IsNotUsed() && !jc.mGlobalAxis.IsNotUsed())
-				{
-					lhc->setInWorldSpace(	body0->getTransform(), body1->getTransform(),
-											ToHkVector4(jc.mGlobalAnchor), ToHkVector4(jc.mGlobalAxis));
-				}
-				else
-				{
-					Point Right0, Up0;	ComputeBasis(jc.mLocalAxis0, Right0, Up0);
-					Point Right1, Up1;	ComputeBasis(jc.mLocalAxis1, Right1, Up1);
-
-					lhc->setInBodySpace(ToHkVector4(jc.mLocalPivot0), ToHkVector4(jc.mLocalPivot1),
-										ToHkVector4(jc.mLocalAxis0), ToHkVector4(jc.mLocalAxis1),
-										ToHkVector4(Right0), ToHkVector4(Right1));
-				}
-				lhc->setMinAngularLimit(jc.mMinLimitAngle);
-				lhc->setMaxAngularLimit(jc.mMaxLimitAngle);
-
-				constraint = new hkpConstraintInstance(body0, body1, lhc);
-				data = lhc;
-			}
-			else
-			{
-				hkpHingeConstraintData* hc = new hkpHingeConstraintData();
-
-				if(!jc.mGlobalAnchor.IsNotUsed() && !jc.mGlobalAxis.IsNotUsed())
-				{
-					hc->setInWorldSpace(body0->getTransform(), body1->getTransform(),
-										ToHkVector4(jc.mGlobalAnchor), ToHkVector4(jc.mGlobalAxis));
-				}
-				else
-				{
-					hc->setInBodySpace(ToHkVector4(jc.mLocalPivot0), ToHkVector4(jc.mLocalPivot1), ToHkVector4(jc.mLocalAxis0), ToHkVector4(jc.mLocalAxis1));
-				}
-
-				constraint = new hkpConstraintInstance(body0, body1, hc);
-				data = hc;
-			}
-		}
-		break;
-
-		case PINT_JOINT_FIXED:
-		{
-			const PINT_FIXED_JOINT_CREATE& jc = static_cast<const PINT_FIXED_JOINT_CREATE&>(desc);
-
-			if(0)	// Emulating fixed joint with limited hinge
-			{
-				hkpLimitedHingeConstraintData* lhc = new hkpLimitedHingeConstraintData();
-
-				const Point LocalAxis(1,0,0);
-				const Point PerpAxis(0,1,0);
-				lhc->setInBodySpace(ToHkVector4(jc.mLocalPivot0), ToHkVector4(jc.mLocalPivot1), ToHkVector4(LocalAxis), ToHkVector4(LocalAxis), ToHkVector4(PerpAxis), ToHkVector4(PerpAxis));
-				lhc->setMinAngularLimit(0.0f);
-				lhc->setMaxAngularLimit(0.0f);
-				
-				constraint = new hkpConstraintInstance(body0, body1, lhc);
-				data = lhc;
-			}
-
-			if(1)	// Emulating fixed joint with prismatic
-			{
-				hkpPrismaticConstraintData* pris = new hkpPrismaticConstraintData(); 
-
-				const Point LocalAxis(1,0,0);
-				const Point PerpAxis(0,1,0);
-				pris->setInBodySpace(ToHkVector4(jc.mLocalPivot0), ToHkVector4(jc.mLocalPivot1), ToHkVector4(LocalAxis), ToHkVector4(LocalAxis), ToHkVector4(PerpAxis), ToHkVector4(PerpAxis));
-				pris->setMaxLinearLimit(0.0f);
-				pris->setMinLinearLimit(0.0f);
-				
-				constraint = new hkpConstraintInstance(body0, body1, pris);
-				data = pris;
-			}
-		}
-		break;
-
-		case PINT_JOINT_PRISMATIC:
-		{
-			const PINT_PRISMATIC_JOINT_CREATE& jc = static_cast<const PINT_PRISMATIC_JOINT_CREATE&>(desc);
-
-			hkpPrismaticConstraintData* pris = new hkpPrismaticConstraintData(); 
-
-			Point Right0, Up0;	ComputeBasis(jc.mLocalAxis0, Right0, Up0);
-			Point Right1, Up1;	ComputeBasis(jc.mLocalAxis1, Right1, Up1);
-
-			pris->setInBodySpace(	ToHkVector4(jc.mLocalPivot0), ToHkVector4(jc.mLocalPivot1),
-									ToHkVector4(jc.mLocalAxis0), ToHkVector4(jc.mLocalAxis1),
-									ToHkVector4(Right0), ToHkVector4(Right1));
-//			pris->setMaxLinearLimit(10.0f);
-//			pris->setMinLinearLimit(-10.0f);
-			
-			constraint = new hkpConstraintInstance(body0, body1, pris);
-			data = pris;
-		}
-		break;
-	}
-
-	if(constraint)
-	{
-		mPhysicsWorld->addConstraint(constraint); 	
-		constraint->removeReference();
-	}
-	if(data)
-		data->removeReference();
-
-	return constraint;
+	return HAVOK_MAIN_COLOR;
 }
 
 static inline_ void FillResultStruct(PintRaycastHit& hit, const hkpWorldRayCastOutput& result, const Point& origin, const Point& dir, float max_dist)
@@ -1839,7 +1143,18 @@ void Havok::TestNewFeature()
 ////////////////////////////////////////////////////////////////////////////////
 
 static Havok* gHavok = null;
-static void gHavok_GetOptionsFromGUI();
+//static void gHavok_GetOptionsFromGUI();
+
+class MyUICallback : public UICallback
+{
+	public:
+	virtual	void			UIModificationCallback()
+	{
+//		if(gHavok)
+//			gHavok->UpdateFromUI();
+	}
+
+}gUICallback;
 
 Havok* GetHavok()
 {
@@ -1858,452 +1173,24 @@ void Havok_Close()
 
 void Havok_Init(const PINT_WORLD_CREATE& desc)
 {
-	gHavok_GetOptionsFromGUI();
+//	gHavok_GetOptionsFromGUI();
+	Havok_::GetOptionsFromGUI();
 
 	ASSERT(!gHavok);
-	gHavok = ICE_NEW(Havok);
+	gHavok = ICE_NEW(Havok)(Havok_::GetEditableParams());
 	gHavok->Init(desc);
 }
 
-/*
-static void createBrickWall( hkpWorld* world, int height, int length, const hkVector4& position, hkReal gapWidth, hkpConvexShape* box, hkVector4Parameter halfExtents )
-{
-	hkVector4 posx = position;
-	// do a raycast to place the wall
-	{
-		hkpWorldRayCastInput ray;
-		ray.m_from = posx;
-		ray.m_to = posx;
-
-		ray.m_from(1) += 20.0f;
-		ray.m_to(1)   -= 20.0f;
-
-		hkpWorldRayCastOutput result;
-		world->castRay( ray, result );
-		posx.setInterpolate4( ray.m_from, ray.m_to, result.m_hitFraction );
-	}
-	// move the start point
-	posx(0) -= ( gapWidth + 2.0f * halfExtents(0) ) * length * 0.5f;
-	posx(1) -= halfExtents(1) + box->getRadius();
-
-	hkArray<hkpEntity*> entitiesToAdd;
-
-	for ( int x = 0; x < length; x ++ )		// along the ground
-	{
-		hkVector4 pos = posx;
-		for( int ii = 0; ii < height; ii++ )
-		{
-			pos(1) += (halfExtents(1) + box->getRadius())* 2.0f;
-
-			hkpRigidBodyCinfo boxInfo;
-			boxInfo.m_mass = 10.0f;
-			hkMassProperties massProperties;
-			hkpInertiaTensorComputer::computeBoxVolumeMassProperties(halfExtents, boxInfo.m_mass, massProperties);
-
-			boxInfo.m_mass = massProperties.m_mass;
-			boxInfo.m_centerOfMass = massProperties.m_centerOfMass;
-			boxInfo.m_inertiaTensor = massProperties.m_inertiaTensor;
-			boxInfo.m_solverDeactivation = boxInfo.SOLVER_DEACTIVATION_MEDIUM;
-			boxInfo.m_shape = box;
-			//boxInfo.m_qualityType = HK_COLLIDABLE_QUALITY_DEBRIS;
-			boxInfo.m_restitution = 0.0f;
-
-			boxInfo.m_motionType = hkpMotion::MOTION_BOX_INERTIA;
-
-			{
-				boxInfo.m_position = pos;
-				hkpRigidBody* boxRigidBody = new hkpRigidBody(boxInfo);
-				world->addEntity( boxRigidBody );
-				boxRigidBody->removeReference();
-			}
-
-			pos(1) += (halfExtents(1) + box->getRadius())* 2.0f;
-			pos(0) += halfExtents(0) * 0.6f;
-			{
-				boxInfo.m_position = pos;
-				hkpRigidBody* boxRigidBody = new hkpRigidBody(boxInfo);
-				entitiesToAdd.pushBack(boxRigidBody);
-			}
-			pos(0) -= halfExtents(0) * 0.6f;
-		}
-		posx(0) += halfExtents(0)* 2.0f + gapWidth;
-	}
-	world->addEntityBatch( entitiesToAdd.begin(), entitiesToAdd.getSize());
-
-	for (int i=0; i < entitiesToAdd.getSize(); i++){ entitiesToAdd[i]->removeReference(); }
-}
-
-static void setupPhysics(hkpWorld* physicsWorld)
-{
-	//
-	//  Create the ground box
-	//
-	{
-		hkVector4 groundRadii(70.0f, 2.0f, 140.0f);
-		hkpConvexShape* shape = new hkpBoxShape(groundRadii , 0);
-
-		hkpRigidBodyCinfo ci;
-		ci.m_shape			= shape;
-		ci.m_motionType		= hkpMotion::MOTION_FIXED;
-		ci.m_position		= hkVector4( 0.0f, -2.0f, 0.0f );
-		ci.m_qualityType	= HK_COLLIDABLE_QUALITY_FIXED;
-
-		physicsWorld->addEntity(new hkpRigidBody(ci))->removeReference();
-		shape->removeReference();
-	}
-
-	hkVector4 groundPos( 0.0f, 0.0f, 0.0f );
-	hkVector4 posy = groundPos;
-
-	//
-	// Create the walls
-	//
-
-	int wallHeight = 8;
-	int wallWidth  = 8;
-	int numWalls = 6;
-	hkVector4 boxSize( 1.0f, 0.5f, 0.5f);
-	hkpBoxShape* box = new hkpBoxShape( boxSize , 0 );
-	box->setRadius( 0.0f );
-
-	hkReal deltaZ = 25.0f;
-	posy(2) = -deltaZ * numWalls * 0.5f;
-
-	for ( int y = 0; y < numWalls; y ++ )			// first wall
-	{
-		createBrickWall( physicsWorld, wallHeight, wallWidth, posy, 0.2f, box, boxSize );
-		posy(2) += deltaZ;
-	}
-	box->removeReference();
-
-	//
-	// Create a ball moving towards the walls
-	//
-
-	const hkReal radius = 1.5f;
-	const hkReal sphereMass = 150.0f;
-
-	hkVector4 relPos( 0.0f,radius + 0.0f, 50.0f );
-
-	hkpRigidBodyCinfo info;
-	hkMassProperties massProperties;
-	hkpInertiaTensorComputer::computeSphereVolumeMassProperties(radius, sphereMass, massProperties);
-
-	info.m_mass = massProperties.m_mass;
-	info.m_centerOfMass  = massProperties.m_centerOfMass;
-	info.m_inertiaTensor = massProperties.m_inertiaTensor;
-	info.m_shape = new hkpSphereShape( radius );
-	info.m_position.setAdd4(posy, relPos );
-	info.m_motionType  = hkpMotion::MOTION_BOX_INERTIA;
-
-	info.m_qualityType = HK_COLLIDABLE_QUALITY_BULLET;
-
-
-	hkpRigidBody* sphereRigidBody = new hkpRigidBody( info );
-	g_ball = sphereRigidBody;
-
-	physicsWorld->addEntity( sphereRigidBody );
-	sphereRigidBody->removeReference();
-	info.m_shape->removeReference();
-
-	hkVector4 vel(  0.0f,4.9f, -100.0f );
-	sphereRigidBody->setLinearVelocity( vel );
-}
-*/
-
 ///////////////////////////////////////////////////////////////////////////////
-
-static Container*	gHavokGUI = null;
-static IceComboBox*	gComboBox_NbThreads = null;
-static IceComboBox*	gComboBox_SolverDeactivation = null;
-static IceComboBox*	gComboBox_BroadPhase = null;
-static IceComboBox*	gComboBox_ContactPointGeneration = null;
-static IceComboBox*	gComboBox_MeshFormat = null;
-static IceEditBox*	gEditBox_SolverIter = null;
-static IceEditBox*	gEditBox_LinearDamping = null;
-static IceEditBox*	gEditBox_AngularDamping = null;
-static IceEditBox*	gEditBox_CollisionTolerance = null;
-static IceEditBox*	gEditBox_GlobalBoxSize = null;
-
-enum HavokGUIElement
-{
-	HAVOK_GUI_MAIN,
-	//
-	HAVOK_GUI_ENABLE_SLEEPING,
-	HAVOK_GUI_ENABLE_CCD,
-	HAVOK_GUI_SHARE_SHAPES,
-	HAVOK_GUI_USE_VDB,
-	//
-	HAVOK_GUI_NB_THREADS,
-	HAVOK_GUI_SOLVER_DEACTIVATION,
-	HAVOK_GUI_BP_TYPE,
-	HAVOK_GUI_CONTACT_POINT_GENERATION,
-	HAVOK_GUI_MESH_FORMAT,
-	//
-	HAVOK_GUI_SOLVER_ITER,
-	HAVOK_GUI_LINEAR_DAMPING,
-	HAVOK_GUI_ANGULAR_DAMPING,
-	HAVOK_GUI_COLLISION_TOLERANCE,
-	HAVOK_GUI_GLOBAL_BOX_SIZE,
-};
-
-static void gCheckBoxCallback(const IceCheckBox& check_box, bool checked, void* user_data)
-{
-	switch(check_box.GetID())
-	{
-		case HAVOK_GUI_ENABLE_SLEEPING:
-			gEnableSleeping = checked;
-			break;
-		case HAVOK_GUI_ENABLE_CCD:
-			gUseCCD = checked;
-			break;
-		case HAVOK_GUI_SHARE_SHAPES:
-			gShareShapes = checked;
-			break;
-		case HAVOK_GUI_USE_VDB:
-			gUseVDB = checked;
-			break;
-	}
-}
-
-static udword gSolverDeactivationToIndex[] = { 0, 0, 1, 2, 3, 4 };
-static hkpRigidBodyCinfo::SolverDeactivation gIndexToSolverDeactivation[] = {
-												hkpRigidBodyCinfo::SOLVER_DEACTIVATION_OFF,
-												hkpRigidBodyCinfo::SOLVER_DEACTIVATION_LOW,
-												hkpRigidBodyCinfo::SOLVER_DEACTIVATION_MEDIUM,
-												hkpRigidBodyCinfo::SOLVER_DEACTIVATION_HIGH,
-												hkpRigidBodyCinfo::SOLVER_DEACTIVATION_MAX	};
-
-static udword gNbThreadsToIndex[] = { 0, 0, 1, 2, 3 };
-static udword gIndexToNbThreads[] = { 0, 2, 3, 4 };
-
-static void gHavok_GetOptionsFromGUI()
-{
-	if(gComboBox_NbThreads)
-	{
-		const udword Index = gComboBox_NbThreads->GetSelectedIndex();
-		ASSERT(Index<sizeof(gIndexToNbThreads)/sizeof(gIndexToNbThreads[0]));
-		gNbThreads = gIndexToNbThreads[Index];
-	}
-
-	if(gComboBox_SolverDeactivation)
-	{
-		const udword Index = gComboBox_SolverDeactivation->GetSelectedIndex();
-		ASSERT(Index<sizeof(gIndexToSolverDeactivation)/sizeof(gIndexToSolverDeactivation[0]));
-		gSolverDeactivation = gIndexToSolverDeactivation[Index];
-	}
-
-	if(gComboBox_BroadPhase)
-	{
-		const udword Index = gComboBox_BroadPhase->GetSelectedIndex();
-		gBroadPhaseType = hkpWorldCinfo::BroadPhaseType(Index);
-	}
-
-	if(gComboBox_ContactPointGeneration)
-	{
-		const udword Index = gComboBox_ContactPointGeneration->GetSelectedIndex();
-		gContactPointGeneration = hkpWorldCinfo::ContactPointGeneration(Index);
-	}
-
-	if(gComboBox_MeshFormat)
-	{
-		const udword Index = gComboBox_MeshFormat->GetSelectedIndex();
-		gMeshFormat = HavokMeshFormat(Index);
-	}
-
-	if(gEditBox_SolverIter)
-	{
-		sdword tmp;
-		bool status = gEditBox_SolverIter->GetTextAsInt(tmp);
-		ASSERT(status);
-		ASSERT(tmp>=0);
-		gSolverIterationCount = udword(tmp);
-	}
-
-	if(gEditBox_LinearDamping)
-	{
-		float tmp;
-		bool status = gEditBox_LinearDamping->GetTextAsFloat(tmp);
-		ASSERT(status);
-		ASSERT(tmp>=0.0f);
-		gLinearDamping = tmp;
-	}
-
-	if(gEditBox_AngularDamping)
-	{
-		float tmp;
-		bool status = gEditBox_AngularDamping->GetTextAsFloat(tmp);
-		ASSERT(status);
-		ASSERT(tmp>=0.0f);
-		gAngularDamping = tmp;
-	}
-
-	if(gEditBox_CollisionTolerance)
-	{
-		float tmp;
-		bool status = gEditBox_CollisionTolerance->GetTextAsFloat(tmp);
-		ASSERT(status);
-		ASSERT(tmp>=0.0f);
-		gCollisionTolerance = tmp;
-	}
-
-	if(gEditBox_GlobalBoxSize)
-	{
-		float tmp;
-		bool status = gEditBox_GlobalBoxSize->GetTextAsFloat(tmp);
-		ASSERT(status);
-		ASSERT(tmp>=0.0f);
-		gGlobalBoxSize = tmp;
-	}
-}
 
 IceWindow* Havok_InitGUI(IceWidget* parent, PintGUIHelper& helper)
 {
-	IceWindow* Main = helper.CreateMainWindow(gHavokGUI, parent, HAVOK_GUI_MAIN, "Havok 2012_1_0 options");
-
-	const sdword YStep = 20;
-	const sdword YStepCB = 16;
-	sdword y = 4;
-
-	{
-		const udword CheckBoxWidth = 200;
-
-		helper.CreateCheckBox(Main, HAVOK_GUI_ENABLE_SLEEPING, 4, y, CheckBoxWidth, 20, "Enable sleeping", gHavokGUI, gEnableSleeping, gCheckBoxCallback);
-		y += YStepCB;
-
-		helper.CreateCheckBox(Main, HAVOK_GUI_ENABLE_CCD, 4, y, CheckBoxWidth, 20, "Enable CCD", gHavokGUI, gUseCCD, gCheckBoxCallback);
-		y += YStepCB;
-
-		helper.CreateCheckBox(Main, HAVOK_GUI_SHARE_SHAPES, 4, y, CheckBoxWidth, 20, "Share shapes", gHavokGUI, gShareShapes, gCheckBoxCallback);
-		y += YStepCB;
-
-		helper.CreateCheckBox(Main, HAVOK_GUI_USE_VDB, 4, y, CheckBoxWidth, 20, "Use VDB", gHavokGUI, gUseVDB, gCheckBoxCallback);
-		y += YStepCB;
-	}
-
-	y += YStep;
-
-	const sdword LabelOffsetY = 2;
-	const sdword OffsetX = 90;
-	{
-		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "Solver deact.:", gHavokGUI);
-		ComboBoxDesc CBBD;
-		CBBD.mID		= HAVOK_GUI_SOLVER_DEACTIVATION;
-		CBBD.mParent	= Main;
-		CBBD.mX			= 4+OffsetX;
-		CBBD.mY			= y;
-		CBBD.mWidth		= 200;
-		CBBD.mHeight	= 20;
-		CBBD.mLabel		= "Solver deactivation";
-		gComboBox_SolverDeactivation = ICE_NEW(IceComboBox)(CBBD);
-		gHavokGUI->Add(udword(gComboBox_SolverDeactivation));
-		gComboBox_SolverDeactivation->Add("SOLVER_DEACTIVATION_OFF");
-		gComboBox_SolverDeactivation->Add("SOLVER_DEACTIVATION_LOW");
-		gComboBox_SolverDeactivation->Add("SOLVER_DEACTIVATION_MEDIUM");
-		gComboBox_SolverDeactivation->Add("SOLVER_DEACTIVATION_HIGH");
-		gComboBox_SolverDeactivation->Add("SOLVER_DEACTIVATION_MAX");
-		ASSERT(gSolverDeactivation<sizeof(gSolverDeactivationToIndex)/sizeof(gSolverDeactivationToIndex[0]));
-		gComboBox_SolverDeactivation->Select(gSolverDeactivationToIndex[gSolverDeactivation]);
-		gComboBox_SolverDeactivation->SetVisible(true);
-		y += YStep;
-
-		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "Broadphase:", gHavokGUI);
-		CBBD.mID		= HAVOK_GUI_BP_TYPE;
-		CBBD.mY			= y;
-		CBBD.mLabel		= "Broadphase";
-		gComboBox_BroadPhase = ICE_NEW(IceComboBox)(CBBD);
-		gHavokGUI->Add(udword(gComboBox_BroadPhase));
-		gComboBox_BroadPhase->Add("SAP");
-		gComboBox_BroadPhase->Add("Tree");
-		gComboBox_BroadPhase->Add("Hybrid");
-		gComboBox_BroadPhase->Select(gBroadPhaseType);
-		gComboBox_BroadPhase->SetVisible(true);
-		y += YStep;
-
-		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "Ctc pt gen:", gHavokGUI);
-		CBBD.mID		= HAVOK_GUI_CONTACT_POINT_GENERATION;
-		CBBD.mY			= y;
-		CBBD.mLabel		= "Contact point generation";
-		gComboBox_ContactPointGeneration = ICE_NEW(IceComboBox)(CBBD);
-		gHavokGUI->Add(udword(gComboBox_ContactPointGeneration));
-		gComboBox_ContactPointGeneration->Add("CONTACT_POINT_ACCEPT_ALWAYS");
-		gComboBox_ContactPointGeneration->Add("CONTACT_POINT_REJECT_DUBIOUS");
-		gComboBox_ContactPointGeneration->Add("CONTACT_POINT_REJECT_MANY");
-		gComboBox_ContactPointGeneration->Select(gContactPointGeneration);
-		gComboBox_ContactPointGeneration->SetVisible(true);
-		y += YStep;
-
-		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "Mesh format:", gHavokGUI);
-		CBBD.mID		= HAVOK_GUI_MESH_FORMAT;
-		CBBD.mY			= y;
-		CBBD.mLabel		= "Mesh format";
-		gComboBox_MeshFormat = ICE_NEW(IceComboBox)(CBBD);
-		gHavokGUI->Add(udword(gComboBox_MeshFormat));
-		gComboBox_MeshFormat->Add("BV compressed mesh shape");
-		gComboBox_MeshFormat->Add("Extended mesh shape");
-		gComboBox_MeshFormat->Select(gMeshFormat);
-		gComboBox_MeshFormat->SetVisible(true);
-		y += YStep;
-
-		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "Num threads:", gHavokGUI);
-		CBBD.mID		= HAVOK_GUI_NB_THREADS;
-		CBBD.mY			= y;
-		CBBD.mLabel		= "Num threads";
-		gComboBox_NbThreads = ICE_NEW(IceComboBox)(CBBD);
-		gHavokGUI->Add(udword(gComboBox_NbThreads));
-		gComboBox_NbThreads->Add("Single threaded");
-		gComboBox_NbThreads->Add("2 threads");
-		gComboBox_NbThreads->Add("3 threads");
-		gComboBox_NbThreads->Add("4 threads");
-		ASSERT(gNbThreads<sizeof(gNbThreadsToIndex)/sizeof(gNbThreadsToIndex[0]));
-		gComboBox_NbThreads->Select(gNbThreadsToIndex[gNbThreads]);
-		gComboBox_NbThreads->SetVisible(true);
-		y += YStep;
-	}
-
-	y += YStep;
-
-	const sdword EditBoxWidth = 60;
-	{
-		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "Num solver iter:", gHavokGUI);
-		gEditBox_SolverIter = helper.CreateEditBox(Main, HAVOK_GUI_SOLVER_ITER, 4+OffsetX, y, EditBoxWidth, 20, _F("%d", gSolverIterationCount), gHavokGUI, EDITBOX_INTEGER_POSITIVE, null);
-		y += YStep;
-
-		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "Linear damping:", gHavokGUI);
-		gEditBox_LinearDamping = helper.CreateEditBox(Main, HAVOK_GUI_LINEAR_DAMPING, 4+OffsetX, y, EditBoxWidth, 20, helper.Convert(gLinearDamping), gHavokGUI, EDITBOX_FLOAT_POSITIVE, null);
-		y += YStep;
-
-		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "Angular damping:", gHavokGUI);
-		gEditBox_AngularDamping = helper.CreateEditBox(Main, HAVOK_GUI_ANGULAR_DAMPING, 4+OffsetX, y, EditBoxWidth, 20, helper.Convert(gAngularDamping), gHavokGUI, EDITBOX_FLOAT_POSITIVE, null);
-		y += YStep;
-
-		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "Collision tolerance:", gHavokGUI);
-		gEditBox_CollisionTolerance = helper.CreateEditBox(Main, HAVOK_GUI_COLLISION_TOLERANCE, 4+OffsetX, y, EditBoxWidth, 20, helper.Convert(gCollisionTolerance), gHavokGUI, EDITBOX_FLOAT_POSITIVE, null);
-		y += YStep;
-
-		helper.CreateLabel(Main, 4, y+LabelOffsetY, 90, 20, "World bounds size:", gHavokGUI);
-		gEditBox_GlobalBoxSize = helper.CreateEditBox(Main, HAVOK_GUI_GLOBAL_BOX_SIZE, 4+OffsetX, y, EditBoxWidth, 20, helper.Convert(gGlobalBoxSize), gHavokGUI, EDITBOX_FLOAT_POSITIVE, null);
-		y += YStep;
-	}
-
-	y += YStep;
-	return Main;
+	return Havok_::InitSharedGUI(parent, helper, gUICallback);
 }
 
 void Havok_CloseGUI()
 {
-	Common_CloseGUI(gHavokGUI);
-
-	gComboBox_NbThreads = null;
-	gComboBox_SolverDeactivation = null;
-	gComboBox_BroadPhase = null;
-	gComboBox_ContactPointGeneration = null;
-	gComboBox_MeshFormat = null;
-	gEditBox_SolverIter = null;
-	gEditBox_LinearDamping = null;
-	gEditBox_AngularDamping = null;
-	gEditBox_CollisionTolerance = null;
-	gEditBox_GlobalBoxSize = null;
+	Havok_::CloseSharedGUI();
 }
 
 ///////////////////////////////////////////////////////////////////////////////

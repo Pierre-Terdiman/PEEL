@@ -36,6 +36,9 @@
 				Allocator*	mPreviousAllocator;
 	};
 
+	void	Common_GetFromEditBox(float& value, const IceEditBox* edit_box, float min_value, float max_value);
+	void	Common_GetFromEditBox(udword& value, const IceEditBox* edit_box);
+
 	void	Common_CloseGUI(Container*& gui);
 	sdword	Common_CreateDebugVizUI(	IceWidget* parent, sdword x, sdword y, CBCallback check_box_callback, udword id, udword nb_params,
 										const bool* debug_viz_params, const char** debug_viz_names, IceCheckBox** check_boxes, Container* gui);

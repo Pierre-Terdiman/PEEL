@@ -10,6 +10,7 @@
 #define PINT_HAVOK_H
 
 #include "..\Pint.h"
+#include "..\PINT_Common\PINT_CommonHavok.h"
 
 	class hkMemoryRouter;
 	class hkJobThreadPool;
@@ -27,10 +28,10 @@
 	struct HavokMeshRender;
 	struct InternalCapsuleShape;
 
-	class Havok : public Pint
+	class Havok : public SharedHavok
 	{
 		public:
-														Havok();
+														Havok(const EditableParams& params);
 		virtual											~Havok();
 
 		// Pint
@@ -41,12 +42,8 @@
 		virtual	void									Close();
 		virtual	udword									Update(float dt);
 		virtual	Point									GetMainColor();
-		virtual	void									Render(PintRender& renderer);
 
 		virtual	void									SetDisabledGroups(udword nb_groups, const PintDisabledGroups* groups);
-		virtual	PintObjectHandle						CreateObject(const PINT_OBJECT_CREATE& desc);
-		virtual	bool									ReleaseObject(PintObjectHandle handle);
-		virtual	PintJointHandle							CreateJoint(const PINT_JOINT_CREATE& desc);
 
 		virtual	void*									CreatePhantom(const AABB& box);
 		virtual	udword									BatchRaycastsPhantom(udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts, void**);
@@ -59,11 +56,21 @@
 		virtual	udword									BatchSphereOverlapObjects(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintSphereOverlapData* overlaps);
 
 		virtual	PR										GetWorldTransform(PintObjectHandle handle);
-		virtual	void									ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos);
+		virtual	void									SetWorldTransform(PintObjectHandle handle, const PR& pose);
+
+//		virtual	void									ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos);
+		virtual	void									AddWorldImpulseAtWorldPos(PintObjectHandle handle, const Point& world_impulse, const Point& world_pos);
+
+		virtual	Point									GetAngularVelocity(PintObjectHandle handle);
+		virtual	void									SetAngularVelocity(PintObjectHandle handle, const Point& angular_velocity);
+
+		virtual	float									GetMass(PintObjectHandle handle);
+		virtual	Point									GetLocalInertia(PintObjectHandle handle);
 
 		virtual	void									TestNewFeature();
 
 		virtual	bool									SetKinematicPose(PintObjectHandle handle, const Point& pos);
+		virtual	bool									SetKinematicPose(PintObjectHandle handle, const PR& pr);
 
 		virtual	udword									CreateConvexObject(const PINT_CONVEX_DATA_CREATE& desc);
 		virtual	udword									BatchConvexSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintConvexSweepData* sweeps);
@@ -71,28 +78,7 @@
 
 				void									PrintMemoryStatistics();
 
-				hkMemoryRouter*							mMemoryRouter;
-				char*									mStackBuffer;
 				hkJobThreadPool*						mThreadPool;
-				hkJobQueue*								mJobQueue;
-				hkpWorld*								mPhysicsWorld;
-				hkpPhysicsContext*						mContext;
-				hkVisualDebugger*						mVdb;
-
-//				std::vector<hkpRigidBody*>				mRigidBodies;
-				Container								mRigidBodies;
-				Container								mPhantoms;
-				std::vector<hkpSphereShape*>			mSphereShapes;
-				std::vector<hkpBoxShape*>				mBoxShapes;
-				std::vector<InternalCapsuleShape>		mCapsuleShapes;
-				std::vector<hkpConvexVerticesShape*>	mConvexShapes;
-				std::vector<HavokMeshRender>			mMeshes;
-
-				std::vector<hkpConvexVerticesShape*>	mConvexObjects;
-
-		private:
-				hkpRigidBody*							CreateObject(const hkpRigidBodyCinfo& info, const PINT_OBJECT_CREATE& create, hkpShape* shape);
-				PintObjectHandle						CreateCompoundObject(const PINT_OBJECT_CREATE& desc);
 	};
 
 	IceWindow*	Havok_InitGUI(IceWidget* parent, PintGUIHelper& helper);

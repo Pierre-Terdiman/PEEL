@@ -6,6 +6,12 @@
  */
 ///////////////////////////////////////////////////////////////////////////////
 
+// PhysX 2.84 DLLs:
+// - PhysXCooking.dll
+// - PhysXCore.dll
+// - PhysXLoader.dll
+// - cudart32_30_9.dll
+
 #include "stdafx.h"
 #include "PINT_PhysX284.h"
 #include "..\PINT_Common\PINT_Common.h"
@@ -399,16 +405,14 @@ void PhysX284::GetCaps(PintCaps& caps) const
 	caps.mSupportHingeJoints			= true;
 	caps.mSupportFixedJoints			= true;
 	caps.mSupportPrismaticJoints		= true;
-	caps.mSupportPhantoms				= false;
+	caps.mSupportDistanceJoints			= true;
 	caps.mSupportRaycasts				= true;
 	caps.mSupportBoxSweeps				= true;
 	caps.mSupportSphereSweeps			= true;
 	caps.mSupportCapsuleSweeps			= true;
-	caps.mSupportConvexSweeps			= false;
 	caps.mSupportSphereOverlaps			= true;
 	caps.mSupportBoxOverlaps			= true;
 	caps.mSupportCapsuleOverlaps		= true;
-	caps.mSupportConvexOverlaps			= false;
 }
 
 void PhysX284::Init(const PINT_WORLD_CREATE& desc)
@@ -545,6 +549,7 @@ udword PhysX284::Update(float dt)
 	if(mScene)
 	{
 		mScene->setTiming(1.0f/60.0f, 1, NX_TIMESTEP_FIXED);
+//		mScene->setTiming((1.0f/60.0f)/4.0f, 8, NX_TIMESTEP_FIXED);
 		mScene->simulate(dt);
 		mScene->flushStream();
 		mScene->fetchResults(NX_ALL_FINISHED, true);
@@ -755,7 +760,7 @@ PintObjectHandle PhysX284::CreateObject(const PINT_OBJECT_CREATE& desc)
 		bodyDesc.wakeUpCounter		= 999999999.0f;
 	bodyDesc.linearDamping			= gLinearDamping;
 	bodyDesc.angularDamping			= gAngularDamping;
-//	bodyDesc.maxAngularVelocity		= ;
+	bodyDesc.maxAngularVelocity		= 100.0f;
 //	bodyDesc.CCDMotionThreshold		= ;
 	bodyDesc.flags					= desc.mKinematic ? NX_BF_KINEMATIC : 0;
 //	bodyDesc.sleepLinearVelocity	= ;
@@ -973,6 +978,7 @@ PintJointHandle PhysX284::CreateJoint(const PINT_JOINT_CREATE& desc)
 				NxVec3 wp1;	m1.multiply(ToNxVec3(jc.mLocalPivot1), wp1);
 				Desc.setGlobalAnchor((wp0+wp1)*0.5f);
 			}
+//			Desc.solverExtrapolationFactor = 2.0f;
 			CreatedJoint = mScene->createJoint(Desc);
 			ASSERT(CreatedJoint);
 		}
@@ -1074,6 +1080,32 @@ PintJointHandle PhysX284::CreateJoint(const PINT_JOINT_CREATE& desc)
 				NxVec3 GlobalAxis = (wp0+wp1)*0.5f; 
 				GlobalAxis.normalize();
 				Desc.setGlobalAxis(GlobalAxis);
+			}
+			CreatedJoint = mScene->createJoint(Desc);
+			ASSERT(CreatedJoint);
+		}
+		break;
+
+		case PINT_JOINT_DISTANCE:
+		{
+			const PINT_DISTANCE_JOINT_CREATE& jc = static_cast<const PINT_DISTANCE_JOINT_CREATE&>(desc);
+
+			NxDistanceJointDesc Desc;
+			SetupJointDesc(Desc);
+			Desc.actor[0]		= actor0->isDynamic() ? actor0 : null;
+			Desc.actor[1]		= actor1->isDynamic() ? actor1 : null;
+			Desc.localAnchor[0] = actor0->isDynamic() ? ToNxVec3(jc.mLocalPivot0) : actor0->getGlobalPose().t;
+			Desc.localAnchor[1] = actor1->isDynamic() ? ToNxVec3(jc.mLocalPivot1) : actor1->getGlobalPose().t;
+			Desc.flags = 0;
+			if(jc.mMaxDistance>=0.0f)
+			{
+				Desc.maxDistance	= jc.mMaxDistance;
+				Desc.flags			|= NX_DJF_MAX_DISTANCE_ENABLED;
+			}
+			if(jc.mMinDistance>=0.0f)
+			{
+				Desc.minDistance	= jc.mMinDistance;
+				Desc.flags			|= NX_DJF_MIN_DISTANCE_ENABLED;
 			}
 			CreatedJoint = mScene->createJoint(Desc);
 			ASSERT(CreatedJoint);
@@ -1506,7 +1538,7 @@ PR PhysX284::GetWorldTransform(PintObjectHandle handle)
 	return PR(ToPoint(Pos), ToQuat(Q));
 }
 
-void PhysX284::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
+/*void PhysX284::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
 {
 	NxActor* Actor = GetActorFromHandle(handle);
 	if(!Actor)
@@ -1527,6 +1559,20 @@ void PhysX284::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action
 
 		Actor->addForceAtPos(ToNxVec3(action), ToNxVec3(pos), mode);
 	}
+}*/
+
+void PhysX284::AddWorldImpulseAtWorldPos(PintObjectHandle handle, const Point& world_impulse, const Point& world_pos)
+{
+	NxActor* Actor = GetActorFromHandle(handle);
+	if(!Actor)
+	{
+		NxShape* Shape = GetShapeFromHandle(handle);
+		ASSERT(Shape);
+		Actor = &Shape->getActor();
+	}
+
+	if(Actor->isDynamic())
+		Actor->addForceAtPos(ToNxVec3(world_impulse), ToNxVec3(world_pos), NX_IMPULSE);
 }
 
 bool PhysX284::SetKinematicPose(PintObjectHandle handle, const Point& pos)
@@ -1536,6 +1582,18 @@ bool PhysX284::SetKinematicPose(PintObjectHandle handle, const Point& pos)
 		return false;
 
 	Actor->moveGlobalPosition(ToNxVec3(pos));
+	return true;
+}
+
+bool PhysX284::SetKinematicPose(PintObjectHandle handle, const PR& pr)
+{
+	NxActor* Actor = GetActorFromHandle(handle);
+	if(!Actor)
+		return false;
+
+	Actor->moveGlobalPosition(ToNxVec3(pr.mPos));
+	Actor->moveGlobalOrientationQuat(ToNxQuat(pr.mRot));
+
 	return true;
 }
 

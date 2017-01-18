@@ -1,8 +1,8 @@
 del PhysicsTest.ncb
-del Debug\PhysicsTest.bsc
+ECHO Y | del Debug\*.*
+ECHO Y | del Release\*.*
 del PEEL.ncb
 del PEEL.bsc
-del PEEL.suo
 ECHO Y | del /S *.*pterdiman.user
 ECHO Y | del /S *.*pierre.user
 ECHO Y | del Physics\Debug\*.*
@@ -25,6 +25,12 @@ ECHO Y | del Physics\PINT_Bullet281\Release\*.*
 
 ECHO Y | del Physics\PINT_Bullet282\Debug\*.*
 ECHO Y | del Physics\PINT_Bullet282\Release\*.*
+
+ECHO Y | del Physics\PINT_Bullet285\Debug\*.*
+ECHO Y | del Physics\PINT_Bullet285\Release\*.*
+
+ECHO Y | del Physics\PINT_Embree1_1\Debug\*.*
+ECHO Y | del Physics\PINT_Embree1_1\Release\*.*
 
 ECHO Y | del Physics\PINT_Havok660\Debug\*.*
 ECHO Y | del Physics\PINT_Havok660\Release\*.*
@@ -53,8 +59,20 @@ ECHO Y | del Physics\PINT_IcePhysics\Release\*.*
 ECHO Y | del Physics\PINT_Newton3_9\Debug\*.*
 ECHO Y | del Physics\PINT_Newton3_9\Release\*.*
 
+ECHO Y | del Physics\PINT_Newton3_12\Debug\*.*
+ECHO Y | del Physics\PINT_Newton3_12\Release\*.*
+
 ECHO Y | del Physics\PINT_Newton3_13\Debug\*.*
 ECHO Y | del Physics\PINT_Newton3_13\Release\*.*
+
+ECHO Y | del Physics\PINT_Newton3_13_Stable\Debug\*.*
+ECHO Y | del Physics\PINT_Newton3_13_Stable\Release\*.*
+
+ECHO Y | del Physics\PINT_Newton3_14\Debug\*.*
+ECHO Y | del Physics\PINT_Newton3_14\Release\*.*
+
+ECHO Y | del Physics\PINT_Newton3_14_VC11\Debug\*.*
+ECHO Y | del Physics\PINT_Newton3_14_VC11\Release\*.*
 
 ECHO Y | del Physics\PINT_NovodeX\Debug\*.*
 ECHO Y | del Physics\PINT_NovodeX\Release\*.*
@@ -90,9 +108,57 @@ ECHO Y | del Physics\PINT_PhysX3_3_2\Debug\*.*
 ECHO Y | del Physics\PINT_PhysX3_3_2\Release\*.*
 ECHO Y | del Physics\PINT_PhysX3_3_2\Profile\*.*
 
+ECHO Y | del Physics\PINT_PhysX3_3_4\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_3_4\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_3_4\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_3_WIP\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_3_WIP\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_3_WIP\Profile\*.*
+
 ECHO Y | del Physics\PINT_PhysX3_4\Debug\*.*
 ECHO Y | del Physics\PINT_PhysX3_4\Release\*.*
 ECHO Y | del Physics\PINT_PhysX3_4\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_4_CL_20656189\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_20656189\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_20656189\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_4_CL_20874861\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_20874861\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_20874861\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21490147\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21490147\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21490147\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21542652\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21542652\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21542652\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21562824\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21562824\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21562824\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21578609\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21578609\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_CL_21578609\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_4_GRB_CL_20671011\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_GRB_CL_20671011\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_GRB_CL_20671011\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_4_GRB_CL_20766737\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_GRB_CL_20766737\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_GRB_CL_20766737\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_4_GRB_CL_20878490\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_GRB_CL_20878490\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_GRB_CL_20878490\Profile\*.*
+
+ECHO Y | del Physics\PINT_PhysX3_4_WIP\Debug\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_WIP\Release\*.*
+ECHO Y | del Physics\PINT_PhysX3_4_WIP\Profile\*.*
 
 ECHO Y | del Physics\PINT_PhysX3_3_FreezeFlags\Debug\*.*
 ECHO Y | del Physics\PINT_PhysX3_3_FreezeFlags\Release\*.*

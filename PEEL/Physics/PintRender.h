@@ -24,6 +24,8 @@
 
 		virtual	void	DrawSphere						(float radius, const PR& pose);
 		virtual	void	DrawBox							(const Point& extents, const PR& pose);
+		virtual	void	DrawCapsule						(float radius, float height, const PR& pose);
+		virtual	void	DrawCylinder					(float radius, float height, const PR& pose);
 
 		virtual	void	DrawRaycastData					(udword nb, const PintRaycastData* raycast_data, const PintRaycastHit* hits, const Point& color);
 		virtual	void	DrawRaycastAnyData				(udword nb, const PintRaycastData* raycast_data, const PintBooleanHit* hits, const Point& color);

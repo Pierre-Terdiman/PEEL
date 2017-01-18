@@ -17,6 +17,7 @@
 #include "Loader_Bin.h"
 #include "Loader_RepX.h"
 #include "PintObjectsManager.h"
+#include "GUI_Helpers.h"
 
 //bool gRaycastClosest = true;
 udword gRaycastMode = 0;
@@ -65,9 +66,7 @@ static void RegisterTest(PhysicsTest& test)
 
 static bool CreateDefaultEnvironment(Pint& pint)
 {
-//return true;
-	PINT_BOX_CREATE BoxDesc;
-	BoxDesc.mExtents	= Point(400.0f, 10.0f, 400.0f);
+	PINT_BOX_CREATE BoxDesc(400.0f, 10.0f, 400.0f);
 	BoxDesc.mRenderer	= CreateBoxRenderer(BoxDesc.mExtents);
 	BoxDesc.mRenderer->SetShadows(false);
 
@@ -85,6 +84,14 @@ static bool CreateDefaultEnvironment(Pint& pint)
 
 TestBase::TestBase() : mRepX(null), mCurrentTime(0.0f), mCreateDefaultEnvironment(true)
 {
+	mHighFrictionMaterial.mStaticFriction	= 1.0f;
+	mHighFrictionMaterial.mDynamicFriction	= 1.0f;
+	mHighFrictionMaterial.mRestitution		= 0.0f;
+
+	mZeroFrictionMaterial.mStaticFriction	= 0.0f;
+	mZeroFrictionMaterial.mDynamicFriction	= 0.0f;
+	mZeroFrictionMaterial.mRestitution		= 0.0f;
+
 	RegisterTest(*this);
 }
 
@@ -344,6 +351,23 @@ void TestBase::UnregisterAllCapsuleOverlaps()
 
 /////
 
+void TestBase::RegisterRenderer(PintShapeRenderer* renderer)
+{
+	mRenderers.Add(udword(renderer));
+}
+
+udword TestBase::GetNbRegisteredRenderers() const
+{
+	return mRenderers.GetNbEntries()/(sizeof(PintShapeRenderer*)/sizeof(udword));
+}
+
+PintShapeRenderer** TestBase::GetRegisteredRenderers() const
+{
+	return (PintShapeRenderer**)mRenderers.GetEntries();
+}
+
+/////
+
 void TestBase::CommonRelease()
 {
 //	ObjectsManager::Release();
@@ -366,18 +390,20 @@ void TestBase::CommonRelease()
 	mSphereOverlapData.Empty();
 	mBoxOverlapData.Empty();
 	mCapsuleOverlapData.Empty();
+	mRenderers.Empty();
 	mCameraManager.Release();
 }
 
-void TestBase::CommonUpdate()
+void TestBase::CommonUpdate(float dt)
 {
+	mCurrentTime += dt;
 }
 
 void TestBase::CommonRender(PintRender&)
 {
 }
 
-udword TestBase::Update(Pint& pint)
+udword TestBase::Update(Pint& pint, float dt)
 {
 	return 0;
 }
@@ -385,6 +411,32 @@ udword TestBase::Update(Pint& pint)
 bool TestBase::ProfileUpdate()
 {
 	return false;
+}
+
+void TestBase::CloseUI()
+{
+	const udword Size = mUIElems.GetNbEntries();
+	for(udword i=0;i<Size;i++)
+	{
+		IceWidget* W = (IceWidget*)mUIElems.GetEntry(i);
+		DELETESINGLE(W);
+	}
+	mUIElems.Empty();
+}
+
+void TestBase::AddResetButton(IceWindow* parent, sdword x, sdword y, sdword width)
+{
+	ButtonDesc BD;
+	BD.mID			= 0;
+	BD.mParent		= parent;
+	BD.mX			= x;
+	BD.mY			= y;
+	BD.mWidth		= width;
+	BD.mHeight		= 20;
+	BD.mLabel		= "Reset test";
+	IceButton* IB = ICE_NEW(ResetButton)(*this, BD);
+	RegisterUIElement(IB);
+	IB->SetVisible(true);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -407,6 +459,14 @@ static const char* gDesc_TestNewFeature = "For dev only. Experimental place to t
 
 START_TEST(TestNewFeature, CATEGORY_UNDEFINED, gDesc_TestNewFeature)
 
+	virtual	void TestNewFeature::GetSceneParams(PINT_WORLD_CREATE& desc)
+	{
+		TestBase::GetSceneParams(desc);
+//		desc.mCamera[0] = CameraPose(Point(27.62f, -17.06f, 121.28f), Point(-0.10f, 0.08f, -0.99f));
+//		desc.mCamera[0] = CameraPose(Point(19.62f, 101.67f, 5.35f), Point(0.85f, -0.34f, -0.41f));
+		desc.mCamera[0] = CameraPose(Point(3.54f, 26.57f, 72.47f), Point(-0.02f, -0.71f, -0.70f));
+	}
+
 	virtual bool TestNewFeature::Setup(Pint& pint, const PintCaps& caps)
 	{
 		pint.TestNewFeature();
@@ -428,8 +488,8 @@ END_TEST(TestNewFeature)
 		virtual	const char*			GetName()				{ return "DynamicCompound";		}
 		virtual	TestCategory		GetCategory()	const	{ return CATEGORY_UNDEFINED;	}
 		virtual	bool				Setup(Pint& pint, const PintCaps& caps);
-		virtual	void				CommonUpdate();
-		virtual	udword				Update(Pint& pint);
+		virtual	void				CommonUpdate(float dt);
+		virtual	udword				Update(Pint& pint, float dt);
 		virtual	bool				ProfileUpdate()			{ return false;					}
 
 				PintObjectHandle	mShapes[3];
@@ -475,12 +535,12 @@ bool DynamicCompound::Setup(Pint& pint, const PintCaps& caps)
 	return true;
 }
 
-void DynamicCompound::CommonUpdate()
+void DynamicCompound::CommonUpdate(float dt)
 {
-	mCurrentTime += 1.0f/60.0f;
+	mCurrentTime += dt;
 }
 
-udword DynamicCompound::Update(Pint& pint)
+udword DynamicCompound::Update(Pint& pint, float dt)
 {
 	Matrix3x3 Rot;
 	Rot.RotX(mCurrentTime*1.0f);
@@ -500,8 +560,8 @@ udword DynamicCompound::Update(Pint& pint)
 void RegisterArrayOfRaycasts(TestBase& test, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_y, const Point& dir, float max_dist, const Point& offset)
 {
 	test.UnregisterAllRaycasts();
-	const float OneOverNbX = 1.0f / float(nb_x-1);
-	const float OneOverNbY = 1.0f / float(nb_y-1);
+	const float OneOverNbX = OneOverNb(nb_x);
+	const float OneOverNbY = OneOverNb(nb_y);
 	for(udword y=0;y<nb_y;y++)
 	{
 		const float CoeffY = 2.0f * ((float(y)*OneOverNbY) - 0.5f);
@@ -530,8 +590,8 @@ bool GenerateArrayOfVerticalRaycasts(TestBase& test, float scale, udword nb_x, u
 void RegisterArrayOfBoxSweeps(TestBase& test, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_y, const Point& dir, const Point& extents, const Point& offset, float max_dist)
 {
 	test.UnregisterAllBoxSweeps();
-	const float OneOverNbX = 1.0f / float(nb_x-1);
-	const float OneOverNbY = 1.0f / float(nb_y-1);
+	const float OneOverNbX = OneOverNb(nb_x);
+	const float OneOverNbY = OneOverNb(nb_y);
 	for(udword y=0;y<nb_y;y++)
 	{
 		const float CoeffY = 2.0f * ((float(y)*OneOverNbY) - 0.5f);
@@ -566,8 +626,8 @@ bool GenerateArrayOfVerticalBoxSweeps(TestBase& test, float scale, udword nb_x, 
 void RegisterArrayOfSphereSweeps(TestBase& test, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_y, const Point& dir, float radius, const Point& offset, float max_dist)
 {
 	test.UnregisterAllSphereSweeps();
-	const float OneOverNbX = 1.0f / float(nb_x-1);
-	const float OneOverNbY = 1.0f / float(nb_y-1);
+	const float OneOverNbX = OneOverNb(nb_x);
+	const float OneOverNbY = OneOverNb(nb_y);
 	for(udword y=0;y<nb_y;y++)
 	{
 		const float CoeffY = 2.0f * ((float(y)*OneOverNbY) - 0.5f);
@@ -597,8 +657,8 @@ bool GenerateArrayOfVerticalSphereSweeps(TestBase& test, float scale, udword nb_
 void RegisterArrayOfCapsuleSweeps(TestBase& test, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_y, const Point& dir, float radius, float half_height, const Point& offset, float max_dist)
 {
 	test.UnregisterAllCapsuleSweeps();
-	const float OneOverNbX = 1.0f / float(nb_x-1);
-	const float OneOverNbY = 1.0f / float(nb_y-1);
+	const float OneOverNbX = OneOverNb(nb_x);
+	const float OneOverNbY = OneOverNb(nb_y);
 	for(udword y=0;y<nb_y;y++)
 	{
 		const float CoeffY = 2.0f * ((float(y)*OneOverNbY) - 0.5f);
@@ -876,8 +936,7 @@ bool ProxyShapes::Setup(Pint& pint, const PintCaps& caps)
 	const float Altitude = 10.0f;
 	const float Scale = 20.0f;
 
-	PINT_BOX_CREATE BoxDesc;
-	BoxDesc.mExtents	= Extents;
+	PINT_BOX_CREATE BoxDesc(Extents);
 	BoxDesc.mRenderer	= CreateBoxRenderer(Extents);
 
 	for(udword y=0;y<NbY;y++)

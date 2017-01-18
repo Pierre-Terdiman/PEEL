@@ -83,3 +83,9 @@ bool MyConvex::LoadFile(udword i)
 		printf("Failing to load convex object!\n");
 	return status;
 }
+
+void MyConvex::Scale(float s)
+{
+	for(int i=0;i<mNbVerts;i++)
+		mVerts[i] *= s;
+}

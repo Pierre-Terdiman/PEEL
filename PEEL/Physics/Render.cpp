@@ -10,10 +10,9 @@
 #include "Render.h"
 #include "Pint.h"
 
-void DrawLine(const Point& p0, const Point& p1, const Point& color, float lineWidth)
+void DrawLine(const Point& p0, const Point& p1, const Point& color)
 {
 	glDisable(GL_LIGHTING);
-	glLineWidth(lineWidth);
 	glColor4f(color.x, color.y, color.z, 1.0f);
 	Point av3LineEndpoints[] = {p0, p1};
 	glEnableClientState(GL_VERTEX_ARRAY);
@@ -24,10 +23,9 @@ void DrawLine(const Point& p0, const Point& p1, const Point& color, float lineWi
 	glEnable(GL_LIGHTING);
 }
 
-static void DrawSegments(udword nb, const Point* segments, const Point& color, float lineWidth)
+static void DrawSegments(udword nb, const Point* segments, const Point& color)
 {
 	glDisable(GL_LIGHTING);
-	glLineWidth(lineWidth);
 	glColor4f(color.x, color.y, color.z, 1.0f);
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glVertexPointer(3, GL_FLOAT, sizeof(Point), &segments->x);
@@ -61,7 +59,7 @@ void DrawCircle(udword nb_segments, const Matrix4x4& matrix, const Point& color,
 		tmp[i*2+0] = p0;
 		tmp[i*2+1] = p1;
 	}
-	DrawSegments(segs, tmp, color, 1.0f);
+	DrawSegments(segs, tmp, color);
 }
 
 void DrawTriangle(const Point& p0, const Point& p1, const Point& p2, const Point& color)
@@ -111,6 +109,7 @@ void SetupGLMatrix(const PR& pose)
 	glmat[15] = M.m[3][3];
 
 	glMultMatrixf(&(glmat[0]));
+//	glLoadMatrixf(&(glmat[0]));
 }
 
 void DrawSphere(float radius, const PR& pose)
@@ -257,7 +256,7 @@ static float gCylinderDataCapsBottom[]={
 	1.000000f,0.000000f,0.000000f,0.000000f,-1.000000f,0.000000f,
 };
 
-static void RenderCylinder()
+static void DrawCylinder(bool draw_caps)
 {
 	glEnableClientState(GL_VERTEX_ARRAY);
 	glEnableClientState(GL_NORMAL_ARRAY);
@@ -265,16 +264,51 @@ static void RenderCylinder()
     glNormalPointer(GL_FLOAT, 2*3*sizeof(float), gCylinderData+3);
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 13*2);
 
-    glVertexPointer(3, GL_FLOAT, 2*3*sizeof(float), gCylinderDataCapsTop);
-    glNormalPointer(GL_FLOAT, 2*3*sizeof(float), gCylinderDataCapsTop+3);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
+	if(draw_caps)
+	{
+		glVertexPointer(3, GL_FLOAT, 2*3*sizeof(float), gCylinderDataCapsTop);
+		glNormalPointer(GL_FLOAT, 2*3*sizeof(float), gCylinderDataCapsTop+3);
+		glDrawArrays(GL_TRIANGLES, 0, 36);
 
-    glVertexPointer(3, GL_FLOAT, 2*3*sizeof(float), gCylinderDataCapsBottom);
-    glNormalPointer(GL_FLOAT, 2*3*sizeof(float), gCylinderDataCapsBottom+3);
-	glDrawArrays(GL_TRIANGLES, 0, 36);
+		glVertexPointer(3, GL_FLOAT, 2*3*sizeof(float), gCylinderDataCapsBottom);
+		glNormalPointer(GL_FLOAT, 2*3*sizeof(float), gCylinderDataCapsBottom+3);
+		glDrawArrays(GL_TRIANGLES, 0, 36);
+	}
 
     glDisableClientState(GL_VERTEX_ARRAY);
     glDisableClientState(GL_NORMAL_ARRAY);
+}
+
+static void DrawCapsule(float r, float h)
+{
+	glPushMatrix();
+		glTranslatef(0.0f, h*0.5f, 0.0f);
+		glScalef(r, r, r);
+		glutSolidSphere(1.0f, 12, 12);  // doesn't include texcoords
+	glPopMatrix();
+
+	glPushMatrix();
+		glTranslatef(0.0f, -h*0.5f, 0.0f);
+		glScalef(r, r, r);
+		glutSolidSphere(1.0f, 12, 12);  // doesn't include texcoords
+	glPopMatrix();
+
+	glPushMatrix();
+		glTranslatef(0.0f, h*0.5f, 0.0f);
+		glScalef(r, h, r);
+		glRotatef(90.0f, 1.0f, 0.0f, 0.0f);
+		DrawCylinder(false);
+	glPopMatrix();
+}
+
+static void DrawCylinder(float r, float h)
+{
+	glPushMatrix();
+		glTranslatef(0.0f, h*0.5f, 0.0f);
+		glScalef(r, h, r);
+		glRotatef(90.0f, 1.0f, 0.0f, 0.0f);
+		DrawCylinder(true);
+	glPopMatrix();
 }
 
 void DrawCapsule(float r, float h, const PR& pose)
@@ -299,25 +333,7 @@ void DrawCapsule(float r, float h, const PR& pose)
 
 	glPushMatrix();
 		SetupGLMatrix(pose);
-
-		glPushMatrix();
-			glTranslatef(0.0f, h*0.5f, 0.0f);
-			glScalef(r,r,r);
-			glutSolidSphere(1.0f, 12, 12);  // doesn't include texcoords
-		glPopMatrix();
-
-		glPushMatrix();
-			glTranslatef(0.0f,-h*0.5f, 0.0f);
-			glScalef(r,r,r);
-			glutSolidSphere(1.0f, 12, 12);  // doesn't include texcoords
-		glPopMatrix();
-
-		glPushMatrix();
-			glTranslatef(0.0f,h*0.5f, 0.0f);
-			glScalef(r,h,r);
-			glRotatef(90.0f,1.0f,0.0f,0.0f);
-			RenderCylinder();
-		glPopMatrix();
+		DrawCapsule(r, h);
 	glPopMatrix();
 }
 
@@ -377,6 +393,14 @@ void DrawCapsuleWireframe(float r, float h, const PR& pose, const Point& color)
 	DrawCircle(NbSegments, MM, color, r);
 }
 
+void DrawCylinder(float r, float h, const PR& pose)
+{
+	glPushMatrix();
+		SetupGLMatrix(pose);
+		DrawCylinder(r, h);
+	glPopMatrix();
+}
+
 static ConvexHull* CreateConvexHull(udword nb_verts, const Point* verts)
 {
 	ConvexHull* CH = ICE_NEW(ConvexHull);
@@ -401,8 +425,9 @@ static ConvexHull* CreateConvexHull(udword nb_verts, const Point* verts)
 static void DrawHull(const ConvexHull& hull)
 {
 	const Point* ConvexVerts = hull.GetVerts();
-	udword NbPolys = hull.GetNbPolygons();
+	const udword NbPolys = hull.GetNbPolygons();
 //	printf("NbPolys: %d\n", NbPolys);
+	glEnableClientState(GL_VERTEX_ARRAY);
 	for(udword i=0;i<NbPolys;i++)
 	{
 		const HullPolygon& PolygonData = hull.GetPolygon(i);
@@ -412,20 +437,32 @@ static void DrawHull(const ConvexHull& hull)
 		const udword NbTris = NbVertsInPoly - 2;
 		const udword* Indices = PolygonData.mVRef;
 		udword Offset = 1;
-		for(udword i=0;i<NbTris;i++)
+		if(1)
 		{
-			const udword VRef0 = Indices[0];
-			const udword VRef1 = Indices[Offset];
-			const udword VRef2 = Indices[Offset+1];
-			Offset++;
+			for(udword i=0;i<NbTris;i++)
+			{
+				const udword VRef0 = Indices[0];
+				const udword VRef1 = Indices[Offset];
+				const udword VRef2 = Indices[Offset+1];
+				Offset++;
 
-			const Point av3LineEndpoints[] = {ConvexVerts[VRef0], ConvexVerts[VRef1], ConvexVerts[VRef2]};
-			glEnableClientState(GL_VERTEX_ARRAY);
-			glVertexPointer(3, GL_FLOAT, sizeof(Point), &av3LineEndpoints[0].x);
-			glDrawArrays(GL_TRIANGLES, 0, 3);
-			glDisableClientState(GL_VERTEX_ARRAY);
+				const Point av3LineEndpoints[] = {ConvexVerts[VRef0], ConvexVerts[VRef1], ConvexVerts[VRef2]};
+				glVertexPointer(3, GL_FLOAT, sizeof(Point), &av3LineEndpoints[0].x);
+				glDrawArrays(GL_TRIANGLES, 0, 3);
+			}
+		}
+		else
+		{
+			Point Vertices[1024];
+			for(udword i=0;i<NbVertsInPoly;i++)
+			{
+				Vertices[i] = ConvexVerts[Indices[i]];
+			}
+			glVertexPointer(3, GL_FLOAT, sizeof(Point), &Vertices[0].x);
+			glDrawArrays(GL_TRIANGLE_FAN, 0, NbVertsInPoly);
 		}
 	}
+	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
 static Container* gShapeRenderers = null;
@@ -444,11 +481,15 @@ static PintShapeRenderer* RegisterShapeRenderer(PintShapeRenderer* renderer)
 
 	class PintDLShapeRenderer : public PintShapeRenderer
 	{
+		Matrix4x4	mCached;
+		PR			mLastPR;
 		public:
 
 		PintDLShapeRenderer() : mShadows(true)
 		{
 			mDisplayListNum = glGenLists(1);
+			mLastPR.mPos.SetNotUsed();
+			mLastPR.mRot.SetNotUsed();
 		}
 
 		virtual	~PintDLShapeRenderer()
@@ -460,7 +501,46 @@ static PintShapeRenderer* RegisterShapeRenderer(PintShapeRenderer* renderer)
 		{
 			glPushMatrix();
 			{
-				SetupGLMatrix(pose);
+				if(0)
+				{
+					if(pose!=mLastPR)
+					{
+						mLastPR = pose;
+						mCached = pose;
+					}
+
+					{
+						const Matrix4x4& M = mCached;
+
+						float glmat[16];	//4x4 column major matrix for OpenGL.
+						glmat[0] = M.m[0][0];
+						glmat[1] = M.m[0][1];
+						glmat[2] = M.m[0][2];
+						glmat[3] = M.m[0][3];
+
+						glmat[4] = M.m[1][0];
+						glmat[5] = M.m[1][1];
+						glmat[6] = M.m[1][2];
+						glmat[7] = M.m[1][3];
+
+						glmat[8] = M.m[2][0];
+						glmat[9] = M.m[2][1];
+						glmat[10] = M.m[2][2];
+						glmat[11] = M.m[2][3];
+
+						glmat[12] = M.m[3][0];
+						glmat[13] = M.m[3][1];
+						glmat[14] = M.m[3][2];
+						glmat[15] = M.m[3][3];
+
+						glMultMatrixf(&(glmat[0]));
+					//	glLoadMatrixf(&(glmat[0]));
+					}
+				}
+				else
+				{
+					SetupGLMatrix(pose);
+				}
 //				glColor4f(1.0f, 0.0f, 0.0f, 1.0f);
 				glCallList(mDisplayListNum);
 			}
@@ -518,24 +598,19 @@ static PintShapeRenderer* RegisterShapeRenderer(PintShapeRenderer* renderer)
 		PintCapsuleShapeRenderer(float r, float h)
 		{
 			glNewList(mDisplayListNum, GL_COMPILE);
-				glPushMatrix();
-					glTranslatef(0.0f, h*0.5f, 0.0f);
-					glScalef(r,r,r);
-					glutSolidSphere(1.0f, 12, 12);  // doesn't include texcoords
-				glPopMatrix();
+				DrawCapsule(r, h);
+			glEndList();
+		}
+	};
 
-				glPushMatrix();
-					glTranslatef(0.0f, -h*0.5f, 0.0f);
-					glScalef(r,r,r);
-					glutSolidSphere(1.0f, 12, 12);  // doesn't include texcoords
-				glPopMatrix();
+	class PintCylinderShapeRenderer : public PintDLShapeRenderer
+	{
+		public:
 
-				glPushMatrix();
-					glTranslatef(0.0f, h*0.5f, 0.0f);
-					glScalef(r,h,r);
-					glRotatef(90.0f,1.0f,0.0f,0.0f);
-					RenderCylinder();
-				glPopMatrix();
+		PintCylinderShapeRenderer(float r, float h)
+		{
+			glNewList(mDisplayListNum, GL_COMPILE);
+				DrawCylinder(r, h);
 			glEndList();
 		}
 	};
@@ -576,11 +651,6 @@ static PintShapeRenderer* RegisterShapeRenderer(PintShapeRenderer* renderer)
 		PintMeshShapeRenderer(const SurfaceInterface& surface)
 		{
 			glNewList(mDisplayListNum, GL_COMPILE);
-//				glFrontFace(
-
-//				glDisable(GL_CULL_FACE);
-				glEnable(GL_CULL_FACE);	glCullFace(GL_BACK);
-//				glEnable(GL_CULL_FACE);	glCullFace(GL_FRONT);
 
 				glBegin(GL_TRIANGLES);
 				for(udword i=0;i<surface.mNbFaces;i++)
@@ -608,9 +678,14 @@ PintShapeRenderer* CreateSphereRenderer(float radius)
 	return RegisterShapeRenderer(ICE_NEW(PintSphereShapeRenderer)(radius));
 }
 
-PintShapeRenderer* CreateCapsuleRenderer(float radius, float half_height)
+PintShapeRenderer* CreateCapsuleRenderer(float radius, float height)
 {
-	return RegisterShapeRenderer(ICE_NEW(PintCapsuleShapeRenderer)(radius, half_height));
+	return RegisterShapeRenderer(ICE_NEW(PintCapsuleShapeRenderer)(radius, height));
+}
+
+PintShapeRenderer* CreateCylinderRenderer(float radius, float height)
+{
+	return RegisterShapeRenderer(ICE_NEW(PintCylinderShapeRenderer)(radius, height));
 }
 
 PintShapeRenderer* CreateBoxRenderer(const Point& extents)
@@ -626,6 +701,25 @@ PintShapeRenderer* CreateConvexRenderer(udword nb_verts, const Point* verts)
 PintShapeRenderer* CreateMeshRenderer(const SurfaceInterface& surface)
 {
 	return RegisterShapeRenderer(ICE_NEW(PintMeshShapeRenderer)(surface));
+}
+
+	class PintCustomShapeRenderer : public PintShapeRenderer
+	{
+		public:
+
+							PintCustomShapeRenderer(PintShapeRenderer* renderer) : mRenderer(renderer)			{}
+		virtual				~PintCustomShapeRenderer()	{}
+
+		virtual	void		Render(const PR& pose)						{ mRenderer->Render(pose);				}
+		virtual	void		SetColor(const Point& color, bool isStatic)	{ mRenderer->SetColor(color, isStatic);	}
+		virtual	void		SetShadows(bool flag)						{ mRenderer->SetShadows(flag);			}
+
+		PintShapeRenderer*	mRenderer;
+	};
+
+PintShapeRenderer* CreateCustomRenderer(PintShapeRenderer* renderer)
+{
+	return RegisterShapeRenderer(ICE_NEW(PintCustomShapeRenderer)(renderer));
 }
 
 void ReleaseAllShapeRenderers()

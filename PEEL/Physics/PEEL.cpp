@@ -28,11 +28,12 @@
 #include "RepX_Tools.h"
 #include "TestSelector.h"
 #include "CustomICEAllocator.h"
+#include "GUI_Helpers.h"
 
 #include <mmsystem.h>
 #pragma comment(lib, "winmm.lib")
 
-static const char* gVersion = "1.01";
+static const char* gVersion = "1.1";
 enum RaytracingTestValue
 {
 	RAYTRACING_TEST_DISABLED,
@@ -41,10 +42,11 @@ enum RaytracingTestValue
 };
 static	RaytracingTestValue	gRaytracingTest = RAYTRACING_TEST_DISABLED;
 static	int					gMainHandle = 0;
+static	HWND				gWindowHandle = 0;
 static	int					gMouseX = 0;
 static	int					gMouseY = 0;
 static	bool				gWireframe = false;
-static	bool				gWireframeOverlay = false;
+static	bool				gWireframeOverlay = true;
 static	bool				gAutoCameraMove = false;
 static	bool				gPaused = false;
 static	bool				gOneFrame = false;
@@ -61,9 +63,20 @@ static	bool				gCommaSeparator = false;
 static	bool				gDisplayMessage = false;
 static	float				gDisplayMessageDelay = 0.0f;
 static	udword				gDisplayMessageType = 0;
-		float				gCameraSpeed = 2.0f;
+		float				gCameraSpeed = 0.2f;
 //static	float				gRTDistance = MAX_FLOAT;	// Test how different engines react to "infinite" rays
 static	float				gRTDistance = 5000.0f;
+// TOOL_PICKING
+static	float				gPickingForce = 1.0f;
+// TOOL_ADD_IMPULSE
+static	float				gImpulseMagnitude = 100.0f;
+// TOOL_SHOOT_BOX
+static	float				gBoxSize = 1.0f;
+static	float				gBoxMass = 1.0f;
+static	float				gBoxVelocity = 100.0f;
+// TOOL_CAMERA_TRACKING
+static	PintObjectHandle	gTrackedObject = null;
+static	Pint*				gTrackedEngine = null;
 
 enum ProfilingUnits
 {
@@ -105,6 +118,8 @@ enum ToolIndex
 	TOOL_PICKING,
 	TOOL_ADD_IMPULSE,
 	TOOL_SHOOT_BOX,
+	TOOL_CAMERA_TRACKING,
+//	TOOL_CUSTOM_CONTROL,
 };
 static	ToolIndex		gCurrentTool = TOOL_PICKING;
 
@@ -122,6 +137,33 @@ static FPS						gFPS;
 
 #define MAX_NB_ENGINES			32
 static udword					gFrameNb = 0;
+
+class GUIHelper : public PintGUIHelper
+{
+	public:
+	virtual	const char*		Convert(float value);
+
+	virtual	IceWindow*		CreateMainWindow(Container*& gui, IceWidget* parent, udword id, const char* label);
+	virtual	IceLabel*		CreateLabel		(IceWidget* parent,				sdword x, sdword y, sdword width, sdword height, const char* label, Container* owner);
+	virtual	IceCheckBox*	CreateCheckBox	(IceWidget* parent, udword id,	sdword x, sdword y, sdword width, sdword height, const char* label, Container* owner, bool state, CBCallback callback, const char* tooltip=null);
+	virtual	IceEditBox*		CreateEditBox	(IceWidget* parent, udword id,	sdword x, sdword y, sdword width, sdword height, const char* label, Container* owner, EditBoxFilter filter, EBCallback callback, const char* tooltip=null);
+
+}gGUIHelper;
+
+struct CursorKeysState
+{
+	CursorKeysState() : mUp(false), mDown(false), mLeft(false), mRight(false)	{}
+	void	Reset()
+	{
+		mUp = mDown = mLeft = mRight = false;
+	}
+	bool	mUp;
+	bool	mDown;
+	bool	mLeft;
+	bool	mRight;
+};
+
+static CursorKeysState gState;
 
 static void TestCSVExport();
 static void PEEL_InitGUI();
@@ -152,17 +194,17 @@ struct EngineData
 };
 static EngineData			gEngines[MAX_NB_ENGINES];
 static udword				gNbEngines = 0;
+static udword				gNbSimulateCallsPerFrame = 1;
+static float				gTimestep = 1.0f/60.0f;
 
 class RaytracingWindow;
 static PintPlugin*			gPlugIns[MAX_NB_ENGINES];
 static RaytracingWindow*	gRaytracingWindows[MAX_NB_ENGINES] = {0};
 static udword				gNbPlugIns = 0;
 
-static String*				gRoot = null;
+/*static*/ String*				gRoot = null;
 
-static udword				gCurrentCameraIndex = 0;
-static udword				gNbSceneCameras = 0;
-static CameraPose			gCameraPose[PINT_MAX_CAMERA_POSES];
+static CameraData			gCamera;
 
 typedef PintPlugin* (*GetPintPlugin)	();
 
@@ -205,30 +247,49 @@ static void InitAll(PhysicsTest* test)
 	PINT_WORLD_CREATE Desc;
 	if(test)
 	{
-		test->GetSceneParams(Desc);
+		bool MustResetCamera = false;
 
-		// We only reset the camera when changing scene. That way we let users re-start the test while
-		// focusing on a specific part of the scene. They can always press 'C' to manually reset the
-		// camera anyway.
 		static PhysicsTest* PreviousTest = null;
 		if(test!=PreviousTest)
 		{
+			if(PreviousTest)
+				PreviousTest->CloseUI();
+
+			test->InitUI(gGUIHelper);
 			PreviousTest = test;
-			SetCamera(Desc.mCamera[0].mPos, Desc.mCamera[0].mDir);
-			gCurrentCameraIndex = 0;
-			gNbSceneCameras = 0;
-			gCameraPose[0] = Desc.mCamera[0];
-			CameraPose Default;
-			for(udword i=1;i<PINT_MAX_CAMERA_POSES;i++)
-			{
-				gCameraPose[i] = Desc.mCamera[i];
-				if(		(Desc.mCamera[i].mPos!=Desc.mCamera[i-1].mPos || Desc.mCamera[i].mDir!=Desc.mCamera[i-1].mDir)
-					&&	(Desc.mCamera[i].mPos!=Default.mPos || Desc.mCamera[i].mDir!=Default.mDir)
-					)
-				{
-					gNbSceneCameras++;
-				}
-			}
+
+			// We only reset the camera when changing scene. That way we let users re-start the test while
+			// focusing on a specific part of the scene. They can always press 'C' to manually reset the
+			// camera anyway.
+			MustResetCamera = true;
+
+			// Set focus back to render window, not to break people's habit of browsing the test scenes
+			IceCore::SetFocus(gWindowHandle);
+		}
+
+		// We must get the scene params after initializing the UI
+		test->GetSceneParams(Desc);
+
+		class Access : public PINT_WORLD_CREATE
+		{
+			public:
+			void SetName(const char* name)	{ mTestName = name; }
+		};
+		static_cast<Access&>(Desc).SetName(test->GetName());
+
+		//### crude test - autodetect changes in camera data & reset camera if we found any
+		if(!MustResetCamera)
+		{
+			CameraData Tmp;
+			Tmp.Init(Desc);
+			if(!(Tmp==gCamera))
+				MustResetCamera = true;
+		}
+
+		if(MustResetCamera)
+		{
+			gCamera.Init(Desc);
+			gCamera.Reset();
 		}
 	}
 	else
@@ -238,9 +299,10 @@ static void InitAll(PhysicsTest* test)
 	}
 
 	for(udword i=0;i<gNbPlugIns;i++)
-	{
 		gPlugIns[i]->Init(Desc);
-	}
+
+	gNbSimulateCallsPerFrame = Desc.mNbSimulateCallsPerFrame;
+	gTimestep = Desc.mTimestep;
 
 	gNbEngines = 0;
 	for(udword i=0;i<gNbPlugIns;i++)
@@ -266,6 +328,9 @@ static void CloseRunningTest()
 		}
 		gRunningTest->CommonRelease();
 	}
+	gTrackedObject = null;
+	gTrackedEngine = null;
+	gState.Reset();
 }
 
 static void ResetSQHelpersHitData()
@@ -297,8 +362,11 @@ static void ResetTimers()
 		gEngines[i].mTiming.ResetTimings();
 }
 
-static void ActivateTest()
+static void ActivateTest(PhysicsTest* test=null)
 {
+	if(test)
+		gCandidateTest = test;
+
 	if(gCandidateTest)
 	{
 #ifdef PEEL_PUBLIC_BUILD
@@ -381,6 +449,11 @@ static void KeyboardCallback(unsigned char key, int x, int y)
 				CameraData[1] = GetCameraDir();
 //				Save("PEEL", "Autosaved", "CameraData", CameraData, sizeof(Point)*2);
 				//CopyToClipboard();
+
+				for(udword i=0;i<gNbEngines;i++)
+				{
+					gEngines[i].mPickingData.mObject = null;
+				}
 			}
 			else
 			{
@@ -399,27 +472,13 @@ static void KeyboardCallback(unsigned char key, int x, int y)
 			break;
 		case 'c':
 		case 'C':
-//			ResetCamera();
-			gCurrentCameraIndex = 0;
-			SetCamera(gCameraPose[0].mPos, gCameraPose[0].mDir);
+			gCamera.Reset();
 			break;
 		case '+':
-			//printf("Next camera\n");
-			if(gNbSceneCameras)
-			{
-				if(gCurrentCameraIndex!=gNbSceneCameras)
-					gCurrentCameraIndex++;
-				SetCamera(gCameraPose[gCurrentCameraIndex].mPos, gCameraPose[gCurrentCameraIndex].mDir);
-			}
+			gCamera.SelectNextCamera();
 			break;
 		case '-':
-			//printf("Previous camera\n");
-			if(gNbSceneCameras)
-			{
-				if(gCurrentCameraIndex)
-					gCurrentCameraIndex--;
-				SetCamera(gCameraPose[gCurrentCameraIndex].mPos, gCameraPose[gCurrentCameraIndex].mDir);
-			}
+			gCamera.SelectPreviousCamera();
 			break;
 		case 'p':
 		case 'P':
@@ -483,30 +542,51 @@ static void KeyboardCallback(unsigned char key, int x, int y)
 	}
 }
 
-static void SpecialKeyCallback(int key, int x, int y)
+static void SpecialKeyCallback(int key, int x, int y, bool down)
 {
-	for(udword i=0;i<gNbEngines;i++)
+	if(down)
 	{
-		if(key==i+1)
+		// Function keys are used to enable/disable each engine
+		for(udword i=0;i<gNbEngines;i++)
 		{
-			gEngines[i].mEnabled = !gEngines[i].mEnabled;
+			if(key==i+1)
+			{
+				gEngines[i].mEnabled = !gEngines[i].mEnabled;
+			}
 		}
 	}
 
 	if(!gMenuIsVisible)
 	{
-		switch(key)
+		gRunningTest->SpecialKeyCallback(key, x, y, down);
+
+		const udword Flags = gRunningTest->GetFlags();
+		if(!(Flags & TEST_FLAGS_USE_CURSOR_KEYS))
 		{
-			case GLUT_KEY_UP:		MoveCameraForward(); break;
-			case GLUT_KEY_DOWN:		MoveCameraBackward(); break;
-			case GLUT_KEY_LEFT:		MoveCameraRight(); break;
-			case GLUT_KEY_RIGHT:	MoveCameraLeft(); break;
+			switch(key)
+			{
+				case GLUT_KEY_UP:		gState.mUp = down; break;
+				case GLUT_KEY_DOWN:		gState.mDown = down; break;
+				case GLUT_KEY_LEFT:		gState.mLeft = down; break;
+				case GLUT_KEY_RIGHT:	gState.mRight = down; break;
+			}
 		}
 	}
 	else
 	{
-		gCurrentTest = TestSelectionKeyboardCallback(key, gCurrentTest);
+		if(down)
+			gCurrentTest = TestSelectionKeyboardCallback(key, gCurrentTest);
 	}
+}
+
+static void SpecialKeyDownCallback(int key, int x, int y)
+{
+	SpecialKeyCallback(key, x, y, true);
+}
+
+static void SpecialKeyUpCallback(int key, int x, int y)
+{
+	SpecialKeyCallback(key, x, y, false);
 }
 
 static	bool	gIsLeftButtonDown = false;
@@ -563,10 +643,16 @@ static void MouseCallback(int button, int state, int x, int y)
 						continue;
 					}
 
-					bool status = Raycast(i, Origin, Dir);
-					if(status)
+					if(Raycast(i, Origin, Dir))
 					{
-						printf("Picked object: %d\n", size_t(gEngines[i].mPickingData.mObject));
+						printf("Picked object: 0x%x (%s)\n", size_t(gEngines[i].mPickingData.mObject), gEngines[i].mEngine->GetName());
+
+						const float Mass = gEngines[i].mEngine->GetMass(gEngines[i].mPickingData.mObject);
+						printf("  Mass: %f\n", Mass);
+
+						const Point LocalInertia = gEngines[i].mEngine->GetLocalInertia(gEngines[i].mPickingData.mObject);
+						printf("  Local inertia: %f | %f | %f\n", LocalInertia.x, LocalInertia.y, LocalInertia.z);
+
 						gEngines[i].mDragPoint = gEngines[i].mPickingData.mImpact;
 
 						const PR WorldTransform = gEngines[i].mEngine->GetWorldTransform(gEngines[i].mPickingData.mObject);
@@ -596,19 +682,12 @@ static void MouseCallback(int button, int state, int x, int y)
 				for(udword i=0;i<gNbEngines;i++)
 				{
 					if(!gEngines[i].mEnabled || !gEngines[i].mSupportsCurrentTest)
-					{
 						continue;
-					}
 
-					bool status = Raycast(i, Origin, Dir);
-					if(status)
-					{
-						gEngines[i].mEngine->ApplyActionAtPoint(gEngines[i].mPickingData.mObject, PINT_ACTION_IMPULSE, Dir*100.0f, gEngines[i].mPickingData.mImpact);
-					}
+					if(Raycast(i, Origin, Dir))
+						gEngines[i].mEngine->AddWorldImpulseAtWorldPos(gEngines[i].mPickingData.mObject, Dir*gImpulseMagnitude, gEngines[i].mPickingData.mImpact);
 					else
-					{
 						gEngines[i].mPickingData.mObject = null;
-					}
 				}
 			}
 			else if(gCurrentTool==TOOL_SHOOT_BOX)
@@ -625,19 +704,46 @@ static void MouseCallback(int button, int state, int x, int y)
 
 					if(1)
 					{
-						PINT_BOX_CREATE BoxDesc;
-						BoxDesc.mExtents	= Point(1.0f, 1.0f, 1.0f);
+						PINT_BOX_CREATE BoxDesc(gBoxSize, gBoxSize, gBoxSize);
 						BoxDesc.mRenderer	= CreateBoxRenderer(BoxDesc.mExtents);
 
 						PINT_OBJECT_CREATE ObjectDesc;
 						ObjectDesc.mShapes		= &BoxDesc;
-						ObjectDesc.mMass		= 1.0f;
+						ObjectDesc.mMass		= gBoxMass;
 						ObjectDesc.mPosition	= Origin;
-						ObjectDesc.mLinearVelocity	= Dir * 100.0f;
+						ObjectDesc.mLinearVelocity	= Dir * gBoxVelocity;
 						gEngines[i].mEngine->CreateObject(ObjectDesc);
 					}
 				}
 			}
+			else if(gCurrentTool==TOOL_CAMERA_TRACKING)
+			{
+				if(!gTrackedObject)
+				{
+					const Point Dir = ComputeWorldRay(x, y);
+					const Point Origin = GetCameraPos();
+
+					for(udword i=0;i<gNbEngines;i++)
+					{
+						if(!gEngines[i].mEnabled || !gEngines[i].mSupportsCurrentTest)
+						{
+							gEngines[i].mPickingData.mObject = null;
+							continue;
+						}
+
+						if(Raycast(i, Origin, Dir))
+						{
+							printf("Picked object: %d\n", size_t(gEngines[i].mPickingData.mObject));
+							gTrackedObject = gEngines[i].mPickingData.mObject;
+							gTrackedEngine = gEngines[i].mEngine;
+						}
+						gEngines[i].mPickingData.mObject = null;
+					}
+				}
+			}
+/*			else if(gCurrentTool==TOOL_CUSTOM_CONTROL)
+			{
+			}*/
 			else ASSERT(0);
 		}
 		else
@@ -650,7 +756,7 @@ static void MouseCallback(int button, int state, int x, int y)
 
 static void MotionCallback(int x, int y)
 {
-	if(gIsLeftButtonDown)
+	if(gIsLeftButtonDown && !gTrackedObject)
 	{
 		const int dx = gMouseX - x;
 		const int dy = gMouseY - y;
@@ -691,6 +797,7 @@ static QPCTime	mQPCTimer;
 			mov		ebx, val
 			mov		[ebx], eax
 		}
+//		val = __rdtsc();
 	}
 
 	static inline_ void	EndProfile_RDTSC(udword& val)
@@ -702,6 +809,7 @@ static QPCTime	mQPCTimer;
 			sub		eax, [ebx]
 			mov		[ebx], eax
 		}
+//		val = __rdtsc() - val;
 	}
 
 	static inline_ void	StartProfile_TimeGetTime(udword& val)
@@ -770,12 +878,12 @@ static void NoProfileUpdate(EngineData& engine, float dt)
 	engine.mEngine->Update(dt);
 }
 
-static udword ProfileTestUpdate_RDTSC(PhysicsTest* test, EngineData& engine)
+static udword ProfileTestUpdate_RDTSC(PhysicsTest* test, EngineData& engine, float dt)
 {
 	udword val, TestResult;
 	{
 		::StartProfile_RDTSC(val);
-			TestResult = gRunningTest->Update(*engine.mEngine);
+			TestResult = gRunningTest->Update(*engine.mEngine, dt);
 		::EndProfile_RDTSC(val);
 	}
 	const udword Time = val/1024;
@@ -784,12 +892,12 @@ static udword ProfileTestUpdate_RDTSC(PhysicsTest* test, EngineData& engine)
 	return Time;
 }
 
-static udword ProfileTestUpdate_TimeGetTime(PhysicsTest* test, EngineData& engine)
+static udword ProfileTestUpdate_TimeGetTime(PhysicsTest* test, EngineData& engine, float dt)
 {
 	udword val, TestResult;
 	{
 		::StartProfile_TimeGetTime(val);
-			TestResult = gRunningTest->Update(*engine.mEngine);
+			TestResult = gRunningTest->Update(*engine.mEngine, dt);
 		::EndProfile_TimeGetTime(val);
 	}
 	const udword Time = val;
@@ -798,13 +906,13 @@ static udword ProfileTestUpdate_TimeGetTime(PhysicsTest* test, EngineData& engin
 	return Time;
 }
 
-static udword ProfileTestUpdate_QPC(PhysicsTest* test, EngineData& engine)
+static udword ProfileTestUpdate_QPC(PhysicsTest* test, EngineData& engine, float dt)
 {
 	udword val, TestResult;
 	{
 		QPCTime::Second s;
 		::StartProfile_QPC();
-			TestResult = gRunningTest->Update(*engine.mEngine);
+			TestResult = gRunningTest->Update(*engine.mEngine, dt);
 		::EndProfile_QPC(s);
 		val = udword(s*1000000.0);
 	}
@@ -814,12 +922,12 @@ static udword ProfileTestUpdate_QPC(PhysicsTest* test, EngineData& engine)
 	return Time;
 }
 
-static udword ProfileTestUpdate_RDTSC_Combined(PhysicsTest* test, EngineData& engine)
+static udword ProfileTestUpdate_RDTSC_Combined(PhysicsTest* test, EngineData& engine, float dt)
 {
 	udword val, TestResult;
 	{
 		::StartProfile_RDTSC(val);
-			TestResult = gRunningTest->Update(*engine.mEngine);
+			TestResult = gRunningTest->Update(*engine.mEngine, dt);
 		::EndProfile_RDTSC(val);
 	}
 	const udword Time = val/1024;
@@ -828,12 +936,12 @@ static udword ProfileTestUpdate_RDTSC_Combined(PhysicsTest* test, EngineData& en
 	return Time;
 }
 
-static udword ProfileTestUpdate_TimeGetTime_Combined(PhysicsTest* test, EngineData& engine)
+static udword ProfileTestUpdate_TimeGetTime_Combined(PhysicsTest* test, EngineData& engine, float dt)
 {
 	udword val, TestResult;
 	{
 		::StartProfile_TimeGetTime(val);
-			TestResult = gRunningTest->Update(*engine.mEngine);
+			TestResult = gRunningTest->Update(*engine.mEngine, dt);
 		::EndProfile_TimeGetTime(val);
 	}
 	const udword Time = val;
@@ -842,13 +950,13 @@ static udword ProfileTestUpdate_TimeGetTime_Combined(PhysicsTest* test, EngineDa
 	return Time;
 }
 
-static udword ProfileTestUpdate_QPC_Combined(PhysicsTest* test, EngineData& engine)
+static udword ProfileTestUpdate_QPC_Combined(PhysicsTest* test, EngineData& engine, float dt)
 {
 	udword val, TestResult;
 	{
 		QPCTime::Second s;
 		::StartProfile_QPC();
-			TestResult = gRunningTest->Update(*engine.mEngine);
+			TestResult = gRunningTest->Update(*engine.mEngine, dt);
 		::EndProfile_QPC(s);
 		val = udword(s*1000000.0);
 	}
@@ -873,7 +981,7 @@ static void Simulate()
 	if(gPaused)
 		return;
 
-	const float dt = 1.0f/60.0f;
+	const float dt = gTimestep;
 
 	Permutation P;
 	P.Init(gNbEngines);
@@ -918,7 +1026,7 @@ static void Simulate()
 
 	if(gRunningTest)
 	{
-		gRunningTest->CommonUpdate();
+		gRunningTest->CommonUpdate(dt);
 		for(udword ii=0;ii<gNbEngines;ii++)
 		{
 			const udword i = P[ii];
@@ -930,33 +1038,33 @@ static void Simulate()
 			{
 				if(gSQProfilingMode==SQ_PROFILING_SIM)
 				{
-					gRunningTest->Update(*gEngines[i].mEngine);
+					gRunningTest->Update(*gEngines[i].mEngine, dt);
 				}
 				else if(gSQProfilingMode==SQ_PROFILING_UPDATE)
 				{
 					if(gProfilingUnits==PROFILING_UNITS_RDTSC)
-						CurrentTime = ProfileTestUpdate_RDTSC(gRunningTest, gEngines[i]);
+						CurrentTime = ProfileTestUpdate_RDTSC(gRunningTest, gEngines[i], dt);
 					else if(gProfilingUnits==PROFILING_UNITS_TIME_GET_TIME)
-						CurrentTime = ProfileTestUpdate_TimeGetTime(gRunningTest, gEngines[i]);
+						CurrentTime = ProfileTestUpdate_TimeGetTime(gRunningTest, gEngines[i], dt);
 					else if(gProfilingUnits==PROFILING_UNITS_QPC)
-						CurrentTime = ProfileTestUpdate_QPC(gRunningTest, gEngines[i]);
+						CurrentTime = ProfileTestUpdate_QPC(gRunningTest, gEngines[i], dt);
 					else ASSERT(0);
 				}
 				else
 				{
 					if(gProfilingUnits==PROFILING_UNITS_RDTSC)
-						CurrentTime = ProfileTestUpdate_RDTSC_Combined(gRunningTest, gEngines[i]);
+						CurrentTime = ProfileTestUpdate_RDTSC_Combined(gRunningTest, gEngines[i], dt);
 					else if(gProfilingUnits==PROFILING_UNITS_TIME_GET_TIME)
-						CurrentTime = ProfileTestUpdate_TimeGetTime_Combined(gRunningTest, gEngines[i]);
+						CurrentTime = ProfileTestUpdate_TimeGetTime_Combined(gRunningTest, gEngines[i], dt);
 					else if(gProfilingUnits==PROFILING_UNITS_QPC)
-						CurrentTime = ProfileTestUpdate_QPC_Combined(gRunningTest, gEngines[i]);
+						CurrentTime = ProfileTestUpdate_QPC_Combined(gRunningTest, gEngines[i], dt);
 					else ASSERT(0);
 				}
 			}
 			else
 			{
 				// Normal update without profiling
-				gRunningTest->Update(*gEngines[i].mEngine);
+				gRunningTest->Update(*gEngines[i].mEngine, dt);
 			}
 		}
 	}
@@ -966,7 +1074,8 @@ static void Simulate()
 
 static void PrintTimings()
 {
-	const float TextScale = 0.02f * float(INITIAL_SCREEN_HEIGHT) / float(gScreenHeight);
+//	const float TextScale = 0.02f * float(INITIAL_SCREEN_HEIGHT) / float(gScreenHeight);
+	const float TextScale = 0.0175f * float(INITIAL_SCREEN_HEIGHT) / float(gScreenHeight);
 	float y = 1.0f - TextScale;
 
 	const bool MustProfileTestUpdate = gRunningTest ? gRunningTest->ProfileUpdate() : false;
@@ -974,7 +1083,7 @@ static void PrintTimings()
 	if(gRunningTest)
 	{
 		gTexter.setColor(1.0f, 1.0f, 1.0f, 1.0f);
-		gTexter.print(0.0f, y, TextScale, _F("Test: %s (%d camera views available)\n", gRunningTest->GetName(), gNbSceneCameras+1));
+		gTexter.print(0.0f, y, TextScale, _F("Test: %s (%d camera views available)\n", gRunningTest->GetName(), gCamera.mNbSceneCameras+1));
 		y -= TextScale;
 	}
 
@@ -1001,7 +1110,7 @@ static void PrintTimings()
 			}
 			else
 			{
-				gTexter.print(0.0f, y, TextScale, _F("%s: (unsupported)\n", Engine->GetName()));
+				gTexter.print(0.0f, y, TextScale, _F("%s: (unsupported/not exposed)\n", Engine->GetName()));
 			}
 		}
 		else
@@ -1015,6 +1124,24 @@ static void PrintTimings()
 	gTexter.print(0.0f, y, TextScale, _F("Frame: %d", gFrameNb));
 	y -= TextScale;
 	gTexter.print(0.0f, y, TextScale, _F("FPS: %.02f", gFPS.GetFPS()));
+
+	y -= TextScale * 2.0f;
+	if(gRunningTest)
+	{
+		for(udword i=0;i<gNbEngines;i++)
+		{
+			if(gEngines[i].mEnabled && gEngines[i].mSupportsCurrentTest)
+			{
+				ASSERT(gEngines[i].mEngine);
+				Pint* Engine = gEngines[i].mEngine;
+
+				const Point MainColor = Engine->GetMainColor();
+				gTexter.setColor(MainColor.x, MainColor.y, MainColor.z, 1.0f);
+
+				y = gRunningTest->DrawDebugText(*Engine, gTexter, y, TextScale);
+			}
+		}
+	}
 
 	if(gDisplayMessage)
 	{
@@ -1178,6 +1305,13 @@ void SetUserDefinedPolygonMode()
 static udword gLastTime = 0;
 static void RenderCallback()
 {
+	// Automatically reset the test if its "mMustResetTest" member has been set to true.
+	if(gRunningTest && gRunningTest->mMustResetTest)
+	{
+		gRunningTest->mMustResetTest = false;
+		ActivateTest(gRunningTest);
+	}
+
 	gFPS.Update();
 	gPintRender.mFrameNumber++;
 
@@ -1192,15 +1326,35 @@ static void RenderCallback()
 			gDisplayMessageDelay = 0.0f;
 	}
 
-	const float dt = 1.0f/60.0f;
-
 	if(!gMenuIsVisible)
-		Simulate();
+	{
+		for(udword i=0;i<gNbSimulateCallsPerFrame;i++)
+			Simulate();
+	}
 
 	// Clear buffers
 	glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT);
 
-	DrawRectangle(0.0f, 1.0f, 0.0f, 1.0f, Point(0.2f, 0.2f, 0.2f), Point(0.1f, 0.1f, 0.2f), 1.0f);
+//	DrawRectangle(0.0f, 1.0f, 0.0f, 1.0f, Point(0.2f, 0.2f, 0.2f), Point(0.1f, 0.1f, 0.2f), 1.0f);
+	DrawRectangle(0.0f, 1.0f, 0.0f, 1.0f, Point(0.35f, 0.35f, 0.35f), Point(0.1f, 0.1f, 0.2f), 1.0f);
+//	DrawRectangle(0.0f, 1.0f, 0.0f, 1.0f, Point(0.85f, 0.85f, 0.85f), Point(0.1f, 0.1f, 0.5f), 1.0f);
+
+	if(gState.mUp)
+		MoveCameraForward();
+	if(gState.mDown)
+		MoveCameraBackward();
+	if(gState.mLeft)
+		MoveCameraRight();
+	if(gState.mRight)
+		MoveCameraLeft();
+
+	if(gTrackedObject && gTrackedEngine)
+	{
+		const PR Pose = gTrackedEngine->GetWorldTransform(gTrackedObject);
+		const Point CamPos = GetCameraPos();
+		const Point Dir = (Pose.mPos - CamPos).Normalize();
+		SetCamera(CamPos, Dir);
+	}
 
 	// Setup projection matrix
 	glMatrixMode(GL_PROJECTION);
@@ -1210,6 +1364,10 @@ static void RenderCallback()
 	glMatrixMode(GL_MODELVIEW);
 	glLoadIdentity();
 
+//	glDisable(GL_CULL_FACE);
+//	glEnable(GL_CULL_FACE);	glCullFace(GL_FRONT);
+	glEnable(GL_CULL_FACE);	glCullFace(GL_BACK);
+
 	if(gRender && !gMenuIsVisible)
 	{
 		{
@@ -1218,7 +1376,21 @@ static void RenderCallback()
 		}
 
 		if(gRunningTest)
+		{
 			gRunningTest->CommonRender(gPintRender);
+
+			for(udword i=0;i<gNbEngines;i++)
+			{
+				if(gEngines[i].mEnabled && gEngines[i].mSupportsCurrentTest)
+				{
+					ASSERT(gEngines[i].mEngine);
+					Pint* Engine = gEngines[i].mEngine;
+					const Point MainColor = Engine->GetMainColor();
+					glColor3f(MainColor.x, MainColor.y, MainColor.z);
+					gRunningTest->DrawDebugInfo(*Engine, gPintRender);
+				}
+			}
+		}
 
 		for(udword i=0;i<gNbEngines;i++)
 		{
@@ -1237,7 +1409,48 @@ static void RenderCallback()
 				{
 					glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 					glColor3f(0.0f, 0.0f, 0.0f);
+
+					glMatrixMode(GL_PROJECTION);
+					SetupCameraMatrix(1.005f);
+
+					glMatrixMode(GL_MODELVIEW);
+					glLoadIdentity();
+
+					glDisable(GL_LIGHTING);
 					Engine->Render(gPintRender);
+					glEnable(GL_LIGHTING);
+					glMatrixMode(GL_PROJECTION);
+					SetupCameraMatrix();
+
+					glMatrixMode(GL_MODELVIEW);
+					glLoadIdentity();
+				}
+
+				if(0)
+				{
+					glEnable(GL_CULL_FACE);	glCullFace(GL_FRONT);
+
+						glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+//						glColor3f(0.0f, 0.0f, 0.0f);
+						glColor3f(MainColor.x*0.5f, MainColor.y*0.5f, MainColor.z*0.5f);
+
+						glMatrixMode(GL_PROJECTION);
+						SetupCameraMatrix(1.005f);
+
+						glMatrixMode(GL_MODELVIEW);
+						glLoadIdentity();
+
+						glDisable(GL_LIGHTING);
+						Engine->Render(gPintRender);
+						glEnable(GL_LIGHTING);
+
+						glMatrixMode(GL_PROJECTION);
+						SetupCameraMatrix();
+
+						glMatrixMode(GL_MODELVIEW);
+						glLoadIdentity();
+
+					glEnable(GL_CULL_FACE);	glCullFace(GL_BACK);
 				}
 			}
 		}
@@ -1280,11 +1493,11 @@ static void RenderCallback()
 							const Point NewWorldPt = gEngines[i].mLocalPoint * M;
 
 							DrawFrame(NewWorldPt);
-							DrawLine(NewWorldPt, gEngines[i].mDragPoint, gEngines[i].mEngine->GetMainColor(), 1.0f);
+							DrawLine(NewWorldPt, gEngines[i].mDragPoint, gEngines[i].mEngine->GetMainColor());
 
-							Point action = gEngines[i].mDragPoint - NewWorldPt;
+							const Point action = gPickingForce*(gEngines[i].mDragPoint - NewWorldPt);
 
-							gEngines[i].mEngine->ApplyActionAtPoint(gEngines[i].mPickingData.mObject, PINT_ACTION_IMPULSE, action, NewWorldPt);
+							gEngines[i].mEngine->AddWorldImpulseAtWorldPos(gEngines[i].mPickingData.mObject, action, NewWorldPt);
 					}
 				}
 			}
@@ -1298,7 +1511,7 @@ static void RenderCallback()
 		{
 			Point tmp;
 			UnitRandomPt(tmp, Rnd);
-			DrawLine(Point(0.0f, 0.0f, 0.0f), tmp, tmp, 1.0f);
+			DrawLine(Point(0.0f, 0.0f, 0.0f), tmp, tmp);
 		}
 	}
 
@@ -1469,14 +1682,9 @@ static void RenderCallback()
 
 			AutomatedTest* NextTest = AutoTests->SelectNextTest();
 			if(NextTest)
-			{
-				gCandidateTest = NextTest->mTest;
-				ActivateTest();
-			}
+				ActivateTest(NextTest->mTest);
 			else
-			{
 				exit(0);
-			}
 		}
 	}
 	gPEEL_PollRadioButtons();
@@ -1501,7 +1709,7 @@ static void IdleCallback()
 	glutPostRedisplay();
 }
 
-static MyIceAllocator* gIceAllocator = null;
+static CustomIceAllocator* gIceAllocator = null;
 
 static void gCleanup()
 {
@@ -1511,6 +1719,8 @@ static void gCleanup()
 
 	timeBeginPeriod(1);
 	printf("Exiting...\n");
+	if(gRunningTest)
+		gRunningTest->CloseUI();
 	CloseAll();
 
 	DELETESINGLE(gRoot);
@@ -1696,7 +1906,7 @@ int main(int argc, char** argv)
 	ThreadSetup();
 	SRand(42);
 
-	gIceAllocator = new MyIceAllocator;
+	gIceAllocator = new CustomIceAllocator;
 	ASSERT(gIceAllocator);
 	IceCore::SetAllocator(*gIceAllocator);
 
@@ -1746,10 +1956,15 @@ int main(int argc, char** argv)
 	glutReshapeFunc(ReshapeCallback);
 	glutIdleFunc(IdleCallback);
 	glutKeyboardFunc(KeyboardCallback);
-	glutSpecialFunc(SpecialKeyCallback);
+	glutSpecialFunc(SpecialKeyDownCallback);
+//	glutKeyboardUpFunc(KeyboardUpCallback);
+	glutSpecialUpFunc(SpecialKeyUpCallback);
 	glutMouseFunc(MouseCallback);
 	glutMotionFunc(MotionCallback);
 	MotionCallback(0,0);
+
+	// We'll need the window handle to set the focus back to the render window
+	gWindowHandle = WindowFromDC(wglGetCurrentDC());
 
 	// Setup default render states
 	glClearColor(0.2f, 0.2f, 0.2f, 1.0);
@@ -1913,18 +2128,6 @@ int main(int argc, char** argv)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-	class GUIHelper : public PintGUIHelper
-	{
-		public:
-		virtual	const char*		Convert(float value);
-
-		virtual	IceWindow*		CreateMainWindow(Container*& gui, IceWidget* parent, udword id, const char* label);
-		virtual	IceLabel*		CreateLabel		(IceWidget* parent,				sdword x, sdword y, sdword width, sdword height, const char* label, Container* owner);
-		virtual	IceCheckBox*	CreateCheckBox	(IceWidget* parent, udword id,	sdword x, sdword y, sdword width, sdword height, const char* label, Container* owner, bool state, CBCallback callback, const char* tooltip=null);
-		virtual	IceEditBox*		CreateEditBox	(IceWidget* parent, udword id,	sdword x, sdword y, sdword width, sdword height, const char* label, Container* owner, EditBoxFilter filter, EBCallback callback, const char* tooltip=null);
-
-	}gGUIHelper;
-
 const char* GUIHelper::Convert(float value)
 {
 	static char ConvertBuffer[256];
@@ -2031,6 +2234,19 @@ static IceRadioButton*	gRadioButton_RT_Disabled = null;
 static IceRadioButton*	gRadioButton_RT_ST = null;
 static IceRadioButton*	gRadioButton_RT_MT = null;
 
+static IceEditBox*	gEditBox_PickingForce = null;
+static IceLabel*	gLabel_PickingForce = null;
+
+static IceEditBox*	gEditBox_ImpulseMagnitude = null;
+static IceLabel*	gLabel_ImpulseMagnitude = null;
+
+static IceEditBox*	gEditBox_BoxSize = null;
+static IceLabel*	gLabel_BoxSize = null;
+static IceEditBox*	gEditBox_BoxMass = null;
+static IceLabel*	gLabel_BoxMass = null;
+static IceEditBox*	gEditBox_BoxVelocity = null;
+static IceLabel*	gLabel_BoxVelocity = null;
+
 enum MainGUIElement
 {
 	MAIN_GUI_MAIN,
@@ -2043,6 +2259,11 @@ enum MainGUIElement
 	//
 	MAIN_GUI_CAMERA_SPEED,
 	MAIN_GUI_RAYTRACING_DISTANCE,
+	MAIN_GUI_PICKING_FORCE,
+	MAIN_GUI_IMPULSE_MAGNITUDE,
+	MAIN_GUI_BOX_SIZE,
+	MAIN_GUI_BOX_MASS,
+	MAIN_GUI_BOX_VELOCITY,
 	//
 	MAIN_GUI_CURRENT_TOOL,
 	MAIN_GUI_PROFILING_UNITS,
@@ -2110,6 +2331,11 @@ static void gCheckBoxCallback(const IceCheckBox& check_box, bool checked, void* 
 
 static const char* gTooltip_CurrentTool			= "Define what happens when pressing the right mouse button in simulation mode";
 static const char* gTooltip_CameraSpeed			= "Camera displacement speed when using the arrow keys";
+static const char* gTooltip_PickingForce		= "Coeff multiplier for picking force";
+static const char* gTooltip_ImpulseMagnitude	= "Magnitude of impulse applied to object";
+static const char* gTooltip_BoxSize				= "Size of shot box";
+static const char* gTooltip_BoxMass				= "Mass of shot box";
+static const char* gTooltip_BoxVelocity			= "Velocity of shot box";
 static const char* gTooltip_RDTSC				= "Define profiling units in K-Cycles (checked) or ms (unchecked)";
 static const char* gTooltip_RecordMemory		= "Profile performance (unchecked) or memory usage (checked)";
 static const char* gTooltip_RaytracingTest		= "Raytrace current scene from current camera pose, using scene-level raycast calls. Results are dumped to console.";
@@ -2131,23 +2357,13 @@ static void gPEEL_PollRadioButtons()
 
 static void gPEEL_GetOptionsFromGUI()
 {
-	if(gEditBox_CameraSpeed)
-	{
-		float tmp;
-		bool status = gEditBox_CameraSpeed->GetTextAsFloat(tmp);
-		ASSERT(status);
-		ASSERT(tmp>=0.0f);
-		gCameraSpeed = tmp;
-	}
-
-	if(gEditBox_RaytracingDistance)
-	{
-		float tmp;
-		bool status = gEditBox_RaytracingDistance->GetTextAsFloat(tmp);
-		ASSERT(status);
-		ASSERT(tmp>=0.0f);
-		gRTDistance = tmp;
-	}
+	gImpulseMagnitude = GetFromEditBox(gImpulseMagnitude, gEditBox_ImpulseMagnitude, 0.0f, MAX_FLOAT);
+	gBoxSize = GetFromEditBox(gBoxSize, gEditBox_BoxSize, 0.0f, MAX_FLOAT);
+	gBoxMass = GetFromEditBox(gBoxMass, gEditBox_BoxMass, 0.0f, MAX_FLOAT);
+	gBoxVelocity = GetFromEditBox(gBoxVelocity, gEditBox_BoxVelocity, 0.0f, MAX_FLOAT);
+	gPickingForce = GetFromEditBox(gPickingForce, gEditBox_PickingForce, 0.0f, MAX_FLOAT);
+	gCameraSpeed = GetFromEditBox(gCameraSpeed, gEditBox_CameraSpeed, 0.0f, MAX_FLOAT);
+	gRTDistance = GetFromEditBox(gRTDistance, gEditBox_RaytracingDistance, 0.0f, MAX_FLOAT);
 
 	if(gComboBox_CurrentTool)
 	{
@@ -2182,25 +2398,35 @@ static void gPEEL_GetOptionsFromGUI()
 	}
 }
 
+static void GetFromEditBox(float& value, const IceEditBox* edit_box, float min_value, float max_value)
+{
+	if(edit_box)
+	{
+		float Value;
+		bool status = edit_box->GetTextAsFloat(Value);
+		ASSERT(status);
+		ASSERT(Value>=min_value && Value<=max_value);
+		value = Value;
+	}
+}
+
 static void gEBCallback(const IceEditBox& edit_box, udword param, void* user_data)
 {
 //	printf("gEBCallback\n");
 	if(edit_box.GetID()==MAIN_GUI_CAMERA_SPEED)
-	{
-		float tmp;
-		bool status = edit_box.GetTextAsFloat(tmp);
-		ASSERT(status);
-		ASSERT(tmp>=0.0f);
-		gCameraSpeed = tmp;
-	}
+		GetFromEditBox(gCameraSpeed, &edit_box, 0.0f, MAX_FLOAT);
 	else if(edit_box.GetID()==MAIN_GUI_RAYTRACING_DISTANCE)
-	{
-		float tmp;
-		bool status = edit_box.GetTextAsFloat(tmp);
-		ASSERT(status);
-		ASSERT(tmp>=0.0f);
-		gRTDistance = tmp;
-	}
+		GetFromEditBox(gRTDistance, &edit_box, 0.0f, MAX_FLOAT);
+	else if(edit_box.GetID()==MAIN_GUI_PICKING_FORCE)
+		GetFromEditBox(gPickingForce, &edit_box, 0.0f, MAX_FLOAT);
+	else if(edit_box.GetID()==MAIN_GUI_IMPULSE_MAGNITUDE)
+		GetFromEditBox(gImpulseMagnitude, &edit_box, 0.0f, MAX_FLOAT);
+	else if(edit_box.GetID()==MAIN_GUI_BOX_SIZE)
+		GetFromEditBox(gBoxSize, &edit_box, 0.0f, MAX_FLOAT);
+	else if(edit_box.GetID()==MAIN_GUI_BOX_MASS)
+		GetFromEditBox(gBoxMass, &edit_box, 0.0f, MAX_FLOAT);
+	else if(edit_box.GetID()==MAIN_GUI_BOX_VELOCITY)
+		GetFromEditBox(gBoxVelocity, &edit_box, 0.0f, MAX_FLOAT);
 }
 
 class ToolComboBox : public IceComboBox
@@ -2212,8 +2438,43 @@ class ToolComboBox : public IceComboBox
 	{
 		if(event==CBE_SELECTION_CHANGED)
 		{
-			gCurrentTool = ToolIndex(GetSelectedIndex());
-	//		printf("OnComboBoxEvent: %d\n", gCurrentTool);
+			const ToolIndex SelectedTool = ToolIndex(GetSelectedIndex());
+//			if(SelectedTool!=gCurrentTool)
+			{
+				gCurrentTool = SelectedTool;
+//				printf("OnComboBoxEvent: %d\n", gCurrentTool);
+				// Following stuff is hardcoded, could be better designed/etc later if needed. Not worth it atm.
+				// We hide the UI elements that are not related to currently selected tool.
+				gEditBox_PickingForce->SetVisible(false);
+				gLabel_PickingForce->SetVisible(false);
+				gEditBox_ImpulseMagnitude->SetVisible(false);
+				gLabel_ImpulseMagnitude->SetVisible(false);
+				gEditBox_BoxSize->SetVisible(false);
+				gLabel_BoxSize->SetVisible(false);
+				gEditBox_BoxMass->SetVisible(false);
+				gLabel_BoxMass->SetVisible(false);
+				gEditBox_BoxVelocity->SetVisible(false);
+				gLabel_BoxVelocity->SetVisible(false);
+				if(SelectedTool==TOOL_PICKING)
+				{
+					gEditBox_PickingForce->SetVisible(true);
+					gLabel_PickingForce->SetVisible(true);
+				}
+				else if(SelectedTool==TOOL_ADD_IMPULSE)
+				{
+					gEditBox_ImpulseMagnitude->SetVisible(true);
+					gLabel_ImpulseMagnitude->SetVisible(true);
+				}
+				else if(SelectedTool==TOOL_SHOOT_BOX)
+				{
+					gEditBox_BoxSize->SetVisible(true);
+					gLabel_BoxSize->SetVisible(true);
+					gEditBox_BoxMass->SetVisible(true);
+					gLabel_BoxMass->SetVisible(true);
+					gEditBox_BoxVelocity->SetVisible(true);
+					gLabel_BoxVelocity->SetVisible(true);
+				}
+			}
 		}
 	}
 };
@@ -2274,8 +2535,7 @@ static void gButtonCallback(IceButton& button, void* user_data)
 			gTrashCache = AutoTests->mTrashCache;
 
 			AutomatedTest* Test = AutoTests->GetCurrentTest();
-			gCandidateTest = Test->mTest;
-			ActivateTest();
+			ActivateTest(Test->mTest);
 		}
 	}
 }
@@ -2375,26 +2635,6 @@ static void PEEL_InitGUI()
 			}
 
 			{
-				gGUIHelper.CreateLabel(MainOptions, 4, y+LabelOffsetY, 90, 20, "Current tool:", gMainGUI);
-				ComboBoxDesc CBBD;
-				CBBD.mID		= MAIN_GUI_CURRENT_TOOL;
-				CBBD.mParent	= MainOptions;
-				CBBD.mX			= 4+OffsetX;
-				CBBD.mY			= y;
-				CBBD.mWidth		= 150;
-				CBBD.mHeight	= 20;
-				CBBD.mLabel		= "Current tool";
-				gComboBox_CurrentTool = ICE_NEW(ToolComboBox)(CBBD);
-				gMainGUI->Add(udword(gComboBox_CurrentTool));
-				gComboBox_CurrentTool->Add("Picking");
-				gComboBox_CurrentTool->Add("Add impulse");
-				gComboBox_CurrentTool->Add("Shoot box");
-				gComboBox_CurrentTool->Select(gCurrentTool);
-				gComboBox_CurrentTool->SetVisible(true);
-				gComboBox_CurrentTool->AddToolTip(gTooltip_CurrentTool);
-				y += YStep;
-			}
-			{
 				gGUIHelper.CreateLabel(MainOptions, 4, y+LabelOffsetY, 90, 20, "Profiling units:", gMainGUI);
 				ComboBoxDesc CBBD;
 				CBBD.mID		= MAIN_GUI_PROFILING_UNITS;
@@ -2451,6 +2691,103 @@ static void PEEL_InitGUI()
 				gComboBox_SQRaycastMode->SetVisible(true);
 				gComboBox_SQRaycastMode->AddToolTip(gTooltip_RaycastMode);
 				y += YStep;
+			}
+
+			{
+				gGUIHelper.CreateLabel(MainOptions, 4, y+LabelOffsetY, 90, 20, "Current tool:", gMainGUI);
+				ComboBoxDesc CBBD;
+				CBBD.mID		= MAIN_GUI_CURRENT_TOOL;
+				CBBD.mParent	= MainOptions;
+				CBBD.mX			= 4+OffsetX;
+				CBBD.mY			= y;
+				CBBD.mWidth		= 150;
+				CBBD.mHeight	= 20;
+				CBBD.mLabel		= "Current tool";
+				gComboBox_CurrentTool = ICE_NEW(ToolComboBox)(CBBD);
+				gMainGUI->Add(udword(gComboBox_CurrentTool));
+				gComboBox_CurrentTool->Add("Picking");
+				gComboBox_CurrentTool->Add("Add impulse");
+				gComboBox_CurrentTool->Add("Shoot box");
+				gComboBox_CurrentTool->Add("Camera tracking");
+//				gComboBox_CurrentTool->Add("Custom control");
+				gComboBox_CurrentTool->Select(gCurrentTool);
+				gComboBox_CurrentTool->SetVisible(true);
+				gComboBox_CurrentTool->AddToolTip(gTooltip_CurrentTool);
+				y += YStep;
+			}
+			{
+				y += YStep;
+				const sdword ToolSpecificAreaWidth = 300;
+				const sdword ToolSpecificAreaHeight = 100;
+
+				// Picking tool
+				{
+					sdword y2 = y;
+					y2 += YStep;
+
+					const sdword OffsetX = 90;
+					const sdword EditBoxWidth = 60;
+					const sdword LabelOffsetY = 2;
+					{
+						gLabel_PickingForce = gGUIHelper.CreateLabel(MainOptions, 14, y2+LabelOffsetY, 90, 20, "Picking force:", gMainGUI);
+						gEditBox_PickingForce = gGUIHelper.CreateEditBox(MainOptions, MAIN_GUI_PICKING_FORCE, 14+OffsetX, y2, EditBoxWidth, 20, gGUIHelper.Convert(gPickingForce), gMainGUI, EDITBOX_FLOAT_POSITIVE, gEBCallback, gTooltip_PickingForce);
+						y2 += YStep;
+					}
+				}
+
+				// Add impulse tool
+				{
+					sdword y2 = y;
+					y2 += YStep;
+
+					const sdword OffsetX = 100;
+					const sdword EditBoxWidth = 60;
+					const sdword LabelOffsetY = 2;
+					{
+						gLabel_ImpulseMagnitude = gGUIHelper.CreateLabel(MainOptions, 14, y2+LabelOffsetY, 100, 20, "Impulse magnitude:", gMainGUI);
+						gEditBox_ImpulseMagnitude = gGUIHelper.CreateEditBox(MainOptions, MAIN_GUI_IMPULSE_MAGNITUDE, 14+OffsetX, y2, EditBoxWidth, 20, gGUIHelper.Convert(gImpulseMagnitude), gMainGUI, EDITBOX_FLOAT_POSITIVE, gEBCallback, gTooltip_ImpulseMagnitude);
+						y2 += YStep;
+					}
+
+					gLabel_ImpulseMagnitude->SetVisible(false);
+					gEditBox_ImpulseMagnitude->SetVisible(false);
+				}
+
+				// Shoot box tool
+				{
+					sdword y2 = y;
+					y2 += YStep;
+
+					const sdword OffsetX = 100;
+					const sdword EditBoxWidth = 60;
+					const sdword LabelOffsetY = 2;
+					{
+						gLabel_BoxSize = gGUIHelper.CreateLabel(MainOptions, 14, y2+LabelOffsetY, 100, 20, "Box size:", gMainGUI);
+						gEditBox_BoxSize = gGUIHelper.CreateEditBox(MainOptions, MAIN_GUI_BOX_SIZE, 14+OffsetX, y2, EditBoxWidth, 20, gGUIHelper.Convert(gBoxSize), gMainGUI, EDITBOX_FLOAT_POSITIVE, gEBCallback, gTooltip_BoxSize);
+						y2 += YStep;
+
+						gLabel_BoxMass = gGUIHelper.CreateLabel(MainOptions, 14, y2+LabelOffsetY, 100, 20, "Box mass:", gMainGUI);
+						gEditBox_BoxMass = gGUIHelper.CreateEditBox(MainOptions, MAIN_GUI_BOX_MASS, 14+OffsetX, y2, EditBoxWidth, 20, gGUIHelper.Convert(gBoxMass), gMainGUI, EDITBOX_FLOAT_POSITIVE, gEBCallback, gTooltip_BoxMass);
+						y2 += YStep;
+
+						gLabel_BoxVelocity = gGUIHelper.CreateLabel(MainOptions, 14, y2+LabelOffsetY, 100, 20, "Box velocity:", gMainGUI);
+						gEditBox_BoxVelocity = gGUIHelper.CreateEditBox(MainOptions, MAIN_GUI_BOX_VELOCITY, 14+OffsetX, y2, EditBoxWidth, 20, gGUIHelper.Convert(gBoxVelocity), gMainGUI, EDITBOX_FLOAT_POSITIVE, gEBCallback, gTooltip_BoxVelocity);
+						y2 += YStep;
+					}
+
+					gLabel_BoxSize->SetVisible(false);
+					gEditBox_BoxSize->SetVisible(false);
+					gLabel_BoxMass->SetVisible(false);
+					gEditBox_BoxMass->SetVisible(false);
+					gLabel_BoxVelocity->SetVisible(false);
+					gEditBox_BoxVelocity->SetVisible(false);
+				}
+
+
+				IceEditBox* tmp = gGUIHelper.CreateEditBox(MainOptions, MAIN_GUI_DUMMY, 10, y, ToolSpecificAreaWidth, ToolSpecificAreaHeight, "=== Tool-specific settings ===", gMainGUI, EDITBOX_TEXT, null);
+//				tmp->AddToolTip(gTooltip_RaytracingTest);
+				tmp->SetReadOnly(true);
+				y += ToolSpecificAreaHeight;
 			}
 
 			if(1)
@@ -2525,8 +2862,9 @@ static void PEEL_InitGUI()
 				tmp->AddToolTip(gTooltip_RaytracingTest);
 				tmp->SetReadOnly(true);
 			}
+
 			{
-				y += YStep * 5;
+				y += YStep * 10;
 
 				ButtonDesc BD;
 //				BD.mStyle		= ;
@@ -2602,7 +2940,7 @@ static void PEEL_CloseGUI()
 {
 	if(gMainGUI)
 	{
-		udword Size = gMainGUI->GetNbEntries();
+		const udword Size = gMainGUI->GetNbEntries();
 		for(udword i=0;i<Size;i++)
 		{
 			IceWidget* W = (IceWidget*)gMainGUI->GetEntry(i);
@@ -2610,6 +2948,21 @@ static void PEEL_CloseGUI()
 		}
 		DELETESINGLE(gMainGUI);
 	}
+	gLabel_ImpulseMagnitude = null;
+	gEditBox_ImpulseMagnitude = null;
+
+	gEditBox_BoxSize = null;
+	gLabel_BoxSize = null;
+
+	gEditBox_BoxMass = null;
+	gLabel_BoxMass = null;
+
+	gEditBox_BoxVelocity = null;
+	gLabel_BoxVelocity = null;
+
+	gLabel_PickingForce = null;
+	gEditBox_PickingForce = null;
+
 	gEditBox_CameraSpeed = null;
 	gEditBox_RaytracingDistance = null;
 	gComboBox_CurrentTool = null;
@@ -2628,7 +2981,10 @@ Quat ShortestRotation(const Point& v0, const Point& v1)
 	const Point cross = v0^v1;
 
 	Quat q = d>-1.0f ? Quat(1.0f + d, cross.x, cross.y, cross.z)
+//					: fabsf(v0.x)<0.1f ? Quat(0.0f, 0.0f, v0.z, -v0.y) : Quat(0.0f, v0.y, -v0.x, 0.0f);
 					: fabsf(v0.x)<0.1f ? Quat(0.0f, 0.0f, v0.z, -v0.y) : Quat(0.0f, v0.y, -v0.x, 0.0f);
+//	PxQuat q = d > -1 ? PxQuat(cross.x, cross.y, cross.z, 1 + d) : PxAbs(v0.x) < 0.1f ? PxQuat(0.0f, v0.z, -v0.y, 0.0f)
+//	                                                                                  : PxQuat(v0.y, -v0.x, 0.0f, 0.0f);
 
 	q.Normalize();
 
@@ -2640,7 +2996,12 @@ static void TestCSVExport()
 	if(!gRunningTest)
 		return;
 
-	const char* Filename = _F(".\\%s.csv", gRunningTest->GetName());
+	const char* Filename;
+	const char* SubName = gRunningTest->GetSubName();
+	if(SubName)
+		Filename = _F(".\\%s_%s.csv", gRunningTest->GetName(), SubName);
+	else
+		Filename = _F(".\\%s.csv", gRunningTest->GetName());
 
 	FILE* globalFile = fopen(Filename, "w");
 	if(!globalFile)

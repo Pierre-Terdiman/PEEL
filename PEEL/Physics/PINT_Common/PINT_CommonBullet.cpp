@@ -11,6 +11,11 @@
 #include "stdafx.h"
 #include "PINT_CommonBullet.h"
 
+Point Bullet::GetMainColor()
+{
+	return BULLET_MAIN_COLOR;
+}
+
 	// A special version to keep track of the triangle index & enable backface culling
 	struct MyClosestRayResultCallback : public btCollisionWorld::RayResultCallback
 	{
@@ -282,7 +287,7 @@ udword Bullet::BatchConvexSweeps(PintSQThreadContext context, udword nb, PintRay
 
 PR Bullet::GetWorldTransform(PintObjectHandle handle)
 {
-	btRigidBody* body = (btRigidBody*)handle;
+	const btRigidBody* body = (const btRigidBody*)handle;
 
 //	body->getCenterOfMassTransform()
 
@@ -291,6 +296,18 @@ PR Bullet::GetWorldTransform(PintObjectHandle handle)
 	return ToPR(trans);
 }
 
+void Bullet::SetWorldTransform(PintObjectHandle handle, const PR& pose)
+{
+	btRigidBody* body = (btRigidBody*)handle;
+
+	btTransform trans;
+	trans.setOrigin(ToBtVector3(pose.mPos));
+	trans.setRotation(ToBtQuaternion(pose.mRot));
+
+	body->getMotionState()->setWorldTransform(trans);
+}
+
+#ifdef REMOVED
 void Bullet::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
 {
 	btRigidBody* body = (btRigidBody*)handle;
@@ -312,5 +329,75 @@ void Bullet::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_t
 	{
 		body->applyImpulse(ToBtVector3(action), rel_pos);
 	}
+/*	else if(action_type==PINT_ACTION_TORQUE)
+	{
+		const btVector3 worldTorque = trans * ToBtVector3(action);
+//		body->applyTorqueImpulse(worldTorque);	//###this makes the tank explode
+//		body->applyTorque(worldTorque);			//###this almost doesn't move the tank
+	}*/
 	else ASSERT(0);
+}
+#endif
+
+void Bullet::AddWorldImpulseAtWorldPos(PintObjectHandle handle, const Point& world_impulse, const Point& world_pos)
+{
+	btRigidBody* body = (btRigidBody*)handle;
+
+	if(body->isStaticObject() || body->isKinematicObject())
+		return;
+
+	btTransform trans;
+	body->getMotionState()->getWorldTransform(trans);
+//	trans = body->getCenterOfMassTransform();
+
+	const btVector3 rel_pos = ToBtVector3(world_pos) - trans.getOrigin();
+
+	body->applyImpulse(ToBtVector3(world_impulse), rel_pos);
+}
+
+void Bullet::AddLocalTorque(PintObjectHandle handle, const Point& local_torque)
+{
+	btRigidBody* body = (btRigidBody*)handle;
+
+	if(body->isStaticObject() || body->isKinematicObject())
+		return;
+
+//	btTransform trans;
+//	body->getMotionState()->getWorldTransform(trans);
+
+//	const btVector3& AngularFactor = body->getAngularFactor();
+//	printf("%f  | %f  | %f\n", AngularFactor.x(), AngularFactor.y(), AngularFactor.z());
+
+//	const btVector3 WorldTorque = trans * ToBtVector3(local_torque);
+//	body->applyTorqueImpulse(WorldTorque);	//###this makes the tank explode
+//	body->applyTorque(WorldTorque);				//###this almost doesn't move the tank
+	body->applyTorque(ToBtVector3(local_torque));	//###this almost doesn't move the tank
+}
+
+Point Bullet::GetAngularVelocity(PintObjectHandle handle)
+{
+	const btRigidBody* body = (const btRigidBody*)handle;
+	return ToPoint(body->getAngularVelocity());
+}
+
+void Bullet::SetAngularVelocity(PintObjectHandle handle, const Point& angular_velocity)
+{
+	btRigidBody* body = (btRigidBody*)handle;
+	body->setAngularVelocity(ToBtVector3(angular_velocity));
+}
+
+float Bullet::GetMass(PintObjectHandle handle)
+{
+	const btRigidBody* body = (const btRigidBody*)handle;
+	const float InvMass = body->getInvMass();
+	if(InvMass==0.0f)
+		return 0.0f;
+	return 1.0f/InvMass;
+}
+
+Point Bullet::GetLocalInertia(PintObjectHandle handle)
+{
+	const btRigidBody* body = (const btRigidBody*)handle;
+	const btVector3& InvInertia = body->getInvInertiaDiagLocal();
+	return Point(1.0f/InvInertia.x(), 1.0f/InvInertia.y(), 1.0f/InvInertia.z());
 }

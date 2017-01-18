@@ -124,8 +124,6 @@ PfnDliHook __pfnDliNotifyHook2 = delayHook;
 	public:
 		MyDelayLoadHook()
 		{
-//			PxDelayLoadHook::setPhysXInstance(this);
-//			PxDelayLoadHook::setPhysXCookingInstance(this);
 			PxSetPhysXDelayLoadHook(this);
 			PxSetPhysXCookingDelayLoadHook(this);
 		}
@@ -151,7 +149,5 @@ PfnDliHook __pfnDliNotifyHook2 = delayHook;
 			return "PhysX3Common_x86_3_3_1.dll";
 		}
 
-//		PX_PHYSX_CORE_API static void SetPhysXInstance(const PxDelayLoadHook* hook);
-//		PX_PHYSX_CORE_API static void SetPhysXCookingInstance(const PxDelayLoadHook* hook);
 	}gMyDelayHook;
 #endif

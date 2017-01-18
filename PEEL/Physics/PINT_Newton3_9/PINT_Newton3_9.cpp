@@ -9,6 +9,17 @@
 /*
 This plugin was created by Julio Jerez. It is currently incomplete and sleeping is not disabled.
 Feel free to improve it and contribute to PEEL by sending back your modifications!
+
+Newton 3.9 DLLs:
+- newton.dll
+- dJointLibrary.dll
+
+- newton_d.dll
+- dJointLibrary_d.dll
+
+The Newton library has been compiled using the provided Visual Studio project. The only change is that
+DG_SSE4_INSTRUCTIONS_SET has been undefined, so that the library doesn't crash on machines that do not
+support SSE4.
 */
 
 #include "stdafx.h"
@@ -20,6 +31,7 @@ Feel free to improve it and contribute to PEEL by sending back your modification
 #include "CustomHinge.h"
 #include "CustomSlider.h"
 #include "CustomBallAndSocket.h"
+#include "..\PINT_Common\PINT_CommonNewton.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -158,20 +170,17 @@ class MyDebugDrawer
 }gDebugDrawer;
 
 ///////////////////////////////////////////////////////////////////////////////
-Newton::Newton() 
-	:mWorld(NULL)
-	,mGlobalGravity(0.0f, -9.8f, 0.0f)
+NewtonPint::NewtonPint() : mWorld(NULL), mGlobalGravity(0.0f, 0.0f, 0.0f)
 {
 }
 
-Newton::~Newton()
+NewtonPint::~NewtonPint()
 {
 }
 
-void Newton::GetCaps(PintCaps& caps) const
+void NewtonPint::GetCaps(PintCaps& caps) const
 {
 	caps.mSupportRigidBodySimulation	= true;
-	caps.mSupportKinematics				= true;
 	caps.mSupportCollisionGroups		= true;
 	caps.mSupportCompounds				= true;
 	caps.mSupportConvexes				= true;
@@ -192,7 +201,7 @@ void Newton::GetCaps(PintCaps& caps) const
 	caps.mSupportConvexOverlaps			= true;
 }
 
-void Newton::Init(const PINT_WORLD_CREATE& desc)
+void NewtonPint::Init(const PINT_WORLD_CREATE& desc)
 {
 	// make sure the global allocation singletons is initialized
 	AllocatiorSyngleton::GetAllocator();
@@ -200,6 +209,8 @@ void Newton::Init(const PINT_WORLD_CREATE& desc)
 	for(udword i=0; i<32; i++) {
 		mGroupMasks[i] = 0xffffffff;
 	}
+
+	SetGravity(desc.mGravity);
 
 	// create the Newton World
 	mWorld = NewtonCreate ();
@@ -222,7 +233,7 @@ void Newton::Init(const PINT_WORLD_CREATE& desc)
 }
 
 
-void Newton::Close()
+void NewtonPint::Close()
 {
 	// Terminate any asynchronous operation.
 	NewtonWaitForUpdateToFinish (mWorld);
@@ -235,7 +246,7 @@ void Newton::Close()
 	NewtonDestroy (mWorld);
 }
 
-const char*	Newton::GetName() const	
+const char*	NewtonPint::GetName() const	
 { 
 	static bool versionRead;
 	static char name [256];
@@ -249,12 +260,12 @@ const char*	Newton::GetName() const
 }
 
 
-void Newton::SetGravity(const Point& gravity)
+void NewtonPint::SetGravity(const Point& gravity)
 {
 	mGlobalGravity = gravity;
 }
 
-udword Newton::Update(float dt)
+udword NewtonPint::Update(float dt)
 {
 	// run the newton update function
 	NewtonUpdate(mWorld,dt);
@@ -262,12 +273,12 @@ udword Newton::Update(float dt)
 	return AllocatiorSyngleton::GetAllocator().gCurrentMemory;
 }
 
-Point Newton::GetMainColor()
+Point NewtonPint::GetMainColor()
 {
-	return Point(0.4f, 1.0f, 0.4f);
+	return NEWTON_MAIN_COLOR;
 }
 
-void Newton::Render(PintRender& renderer, NewtonCollision* const collision, const IceMaths::Matrix4x4& pose) const
+void NewtonPint::Render(PintRender& renderer, NewtonCollision* const collision, const IceMaths::Matrix4x4& pose) const
 {
 	NewtonCollisionInfoRecord info;
 	NewtonCollisionGetInfo(collision, &info);
@@ -359,7 +370,7 @@ void Newton::Render(PintRender& renderer, NewtonCollision* const collision, cons
 
 }
 
-void Newton::Render(PintRender& renderer)
+void NewtonPint::Render(PintRender& renderer)
 {
 	for (NewtonBodyVector::iterator i=mBodies.begin(); i!=mBodies.end(); ++i)
 	{
@@ -374,14 +385,14 @@ void Newton::Render(PintRender& renderer)
 }
 
 // callback to apply external forces to body
-void Newton::ApplyForceAndTorqueCallback (const NewtonBody* const body, dFloat timestep, int threadIndex)
+void NewtonPint::ApplyForceAndTorqueCallback (const NewtonBody* const body, dFloat timestep, int threadIndex)
 {
 	float Ixx;
 	float Iyy;
 	float Izz;
 	float mass;
 
-	const Newton* const peelNewton = (Newton*) NewtonWorldGetUserData (NewtonBodyGetWorld(body));
+	const NewtonPint* const peelNewton = (NewtonPint*) NewtonWorldGetUserData (NewtonBodyGetWorld(body));
 
 	// for this tutorial the only external force in the Gravity
 	NewtonBodyGetMassMatrix (body, &mass, &Ixx, &Iyy, &Izz);
@@ -392,7 +403,7 @@ void Newton::ApplyForceAndTorqueCallback (const NewtonBody* const body, dFloat t
 }
 
 
-NewtonCollision* Newton::CreateShape(NewtonWorld* const world, const PINT_SHAPE_CREATE* const shape, const PintShapeRenderer* const renderer, int groupID) const
+NewtonCollision* NewtonPint::CreateShape(NewtonWorld* const world, const PINT_SHAPE_CREATE* const shape, const PintShapeRenderer* const renderer, int groupID) const
 {
 	IceMaths::Matrix4x4 localPose = shape->mLocalRot;
 	localPose.SetTrans(shape->mLocalPos);
@@ -473,14 +484,14 @@ NewtonCollision* Newton::CreateShape(NewtonWorld* const world, const PINT_SHAPE_
 	return ret;
 }
 
-void Newton::DuplicateCollisionShape (const NewtonWorld* const newtonWorld, NewtonCollision* const newCollision, const NewtonCollision* const sourceCollision)
+void NewtonPint::DuplicateCollisionShape (const NewtonWorld* const newtonWorld, NewtonCollision* const newCollision, const NewtonCollision* const sourceCollision)
 {
 	PinkCookie * const srcCookie = (PinkCookie *)NewtonCollisionGetUserData(sourceCollision);
 	PinkCookie * const newCookie = new PinkCookie (*srcCookie);
 	NewtonCollisionSetUserData(newCollision, newCookie);
 }
 
-void Newton::DestroyCollisionShape (const NewtonWorld* const newtonWorld, const NewtonCollision* const collision)
+void NewtonPint::DestroyCollisionShape (const NewtonWorld* const newtonWorld, const NewtonCollision* const collision)
 {
 	PinkCookie * const cookie = (PinkCookie *)NewtonCollisionGetUserData(collision);
 	if (cookie) {
@@ -489,7 +500,7 @@ void Newton::DestroyCollisionShape (const NewtonWorld* const newtonWorld, const 
 }
 
 
-NewtonCollision* Newton::CreateShape(const PINT_OBJECT_CREATE& desc) const
+NewtonCollision* NewtonPint::CreateShape(const PINT_OBJECT_CREATE& desc) const
 {
 	// see if this is a single shape
 	const PINT_SHAPE_CREATE* const currentShape = desc.mShapes;
@@ -548,36 +559,45 @@ NewtonCollision* Newton::CreateShape(const PINT_OBJECT_CREATE& desc) const
 }
 
 
-PintObjectHandle Newton::CreateObject(const PINT_OBJECT_CREATE& desc)
+PintObjectHandle NewtonPint::CreateObject(const PINT_OBJECT_CREATE& desc)
 {
-	if(!desc.mShapes) {
+	if(!desc.mShapes)
 		return NULL;
-	}
 
 	ASSERT(mWorld);
 
 	NewtonCollision* const shape = CreateShape(desc);
-	if ( shape == NULL )
-	{
+	if(!shape)
 		return NULL;
-	}
 
 	IceMaths::Matrix4x4 pose = desc.mRotation;
 	pose.SetTrans(desc.mPosition);
 
-	if ( mBodies.empty() )
+	if(mBodies.empty())
+		pose.SetTrans(desc.mPosition.x, desc.mPosition.y, desc.mPosition.z);
+
+	NewtonBody* const ret = NewtonCreateDynamicBody(mWorld, shape, (const float*)&pose);
+
+	if(desc.mMass != 0.0f)
 	{
-		pose.SetTrans( desc.mPosition.x, desc.mPosition.y, desc.mPosition.z );
+//		NewtonBodySetContinuousCollisionMode(ret, ccdMode ? 1 : 0);
+		NewtonBodySetMassProperties(ret, desc.mMass, shape);
+		NewtonBodySetVelocity(ret, &desc.mLinearVelocity.x);
+		NewtonBodySetOmega(ret, &desc.mAngularVelocity.x);
+		NewtonBodySetForceAndTorqueCallback(ret, ApplyForceAndTorqueCallback);
+
+		if(desc.mCOMLocalOffset.IsNonZero())
+		{
+			dFloat COM[3];
+			NewtonBodyGetCentreOfMass(ret, COM);
+			COM[0] += desc.mCOMLocalOffset.x;
+			COM[1] += desc.mCOMLocalOffset.y;
+			COM[2] += desc.mCOMLocalOffset.z;
+			NewtonBodySetCentreOfMass(ret, COM);
+		}
 	}
 
-	NewtonBody* const ret = NewtonCreateDynamicBody(mWorld,shape,(const float*)&pose);
-	if ( desc.mMass != 0.0f ) // if it's a static object
-	{
-		NewtonBodySetMassProperties (ret, desc.mMass, shape);
-		NewtonBodySetVelocity(ret,&desc.mLinearVelocity.x);
-		NewtonBodySetOmega(ret,&desc.mAngularVelocity.x);
-		NewtonBodySetForceAndTorqueCallback(ret, ApplyForceAndTorqueCallback);
-	}
+	NewtonBodySetAutoSleep(ret, gEnableSleeping);
 
 	NewtonDestroyCollision(shape);
 
@@ -585,12 +605,12 @@ PintObjectHandle Newton::CreateObject(const PINT_OBJECT_CREATE& desc)
 	return ret;
 }
 
-bool Newton::ReleaseObject(PintObjectHandle handle)
+bool NewtonPint::ReleaseObject(PintObjectHandle handle)
 {
 	return true;
 }
 
-PintJointHandle Newton::CreateJoint(const PINT_JOINT_CREATE& desc)
+PintJointHandle NewtonPint::CreateJoint(const PINT_JOINT_CREATE& desc)
 {
 	CustomJoint* joint = NULL;
 
@@ -639,7 +659,14 @@ PintJointHandle Newton::CreateJoint(const PINT_JOINT_CREATE& desc)
 			matrix = pinMatrix * matrix;
 			CustomSlider* const slider = new CustomSlider (matrix, body0, body1);
 
-			// it appears that physx slider do not have limits
+			if(jc.mMinLimit<=jc.mMaxLimit)
+			{
+				slider->SetLimis(jc.mMinLimit, jc.mMaxLimit);
+				slider->EnableLimits(true);
+			}
+			else
+				slider->EnableLimits(false);
+
 			joint = slider;
 			break;
 		}
@@ -663,7 +690,7 @@ PintJointHandle Newton::CreateJoint(const PINT_JOINT_CREATE& desc)
 	return joint;
 }
 
-void Newton::SetDisabledGroups(udword nb_groups, const PintDisabledGroups* groups)
+void NewtonPint::SetDisabledGroups(udword nb_groups, const PintDisabledGroups* groups)
 {
 	for(udword i = 0; i < nb_groups; i++) {
 		int group0 = groups[i].mGroup0; 
@@ -677,10 +704,10 @@ void Newton::SetDisabledGroups(udword nb_groups, const PintDisabledGroups* group
 	}
 }
 
-int	Newton::OnAABBOverlap (const NewtonMaterial* const material, const NewtonBody* const body0, const NewtonBody* const body1, int threadIndex)
+int	NewtonPint::OnAABBOverlap (const NewtonMaterial* const material, const NewtonBody* const body0, const NewtonBody* const body1, int threadIndex)
 {
-//	Newton* const me = NewtonMaterialGetUserData(material);
-	Newton* const me = (Newton*) NewtonWorldGetUserData(NewtonBodyGetWorld(body0));
+//	NewtonPint* const me = NewtonMaterialGetUserData(material);
+	NewtonPint* const me = (NewtonPint*) NewtonWorldGetUserData(NewtonBodyGetWorld(body0));
 	NewtonCollision* const collsion0 = NewtonBodyGetCollision(body0);
 	NewtonCollision* const collsion1 = NewtonBodyGetCollision(body1);
 
@@ -693,7 +720,7 @@ int	Newton::OnAABBOverlap (const NewtonMaterial* const material, const NewtonBod
 	return (me->mGroupMasks[cookie0->m_collisionGroup] & (1<<cookie1->m_collisionGroup)) ? 1 : 0;
 }
 
-dFloat Newton::GenericRayCast (const NewtonBody* const body, const NewtonCollision* const collisionHit, const dFloat* const normal, int* const collisionID, void* const userData, dFloat intersetParam)
+dFloat NewtonPint::GenericRayCast (const NewtonBody* const body, const NewtonCollision* const collisionHit, const dFloat* const normal, int* const collisionID, void* const userData, dFloat intersetParam)
 {
 	PintRaycastHit* const data = (PintRaycastHit*) userData;
 //	struct PintRaycastHit : public Allocateable
@@ -713,7 +740,7 @@ dFloat Newton::GenericRayCast (const NewtonBody* const body, const NewtonCollisi
 	return data->mDistance;
 }
 
-udword Newton::BatchRaycasts(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts)
+udword NewtonPint::BatchRaycasts(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts)
 {
 	// if we are making a small number of cast do not bother with batching
 /*	if (nb == 1) {
@@ -763,25 +790,25 @@ udword Newton::BatchRaycasts(PintSQThreadContext context, udword nb, PintRaycast
 }
 
 
-udword Newton::BatchBoxSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintBoxSweepData* sweeps)
+udword NewtonPint::BatchBoxSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintBoxSweepData* sweeps)
 {
 	_ASSERTE (0);
 	return 0;
 }
 
-udword Newton::BatchSphereSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintSphereSweepData* sweeps)
+udword NewtonPint::BatchSphereSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintSphereSweepData* sweeps)
 {
 	_ASSERTE (0);
 	return 0;
 }
 
 
-udword Newton::BatchCapsuleSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintCapsuleSweepData* sweeps)
+udword NewtonPint::BatchCapsuleSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintCapsuleSweepData* sweeps)
 {
 	return 0;
 }
 
-PR Newton::GetWorldTransform(PintObjectHandle handle)
+PR NewtonPint::GetWorldTransform(PintObjectHandle handle)
 {
 	NewtonBody* const body = (NewtonBody*)handle;
 	Matrix4x4 matrix;
@@ -789,23 +816,83 @@ PR Newton::GetWorldTransform(PintObjectHandle handle)
 	return PR (matrix);
 }
 
-void Newton::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
+void NewtonPint::SetWorldTransform(PintObjectHandle handle, const PR& pose)
+{
+	NewtonBody* body = (NewtonBody*)handle;
+
+	Matrix4x4 matrix = pose.mRot;
+	matrix.SetTrans(pose.mPos);
+
+	NewtonBodySetMatrix(body, &matrix.m[0][0]);
+}
+
+/*void NewtonPint::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
 {
 	NewtonBody* const body = (NewtonBody*)handle;
-	if(action_type==PINT_ACTION_FORCE) {
+	if(action_type==PINT_ACTION_FORCE)
+	{
 		// this is one case were Physx and Newton are different,
 		// force can only be applied form with in a force and torque call back.
 		// still can apply the force in the form of an impulse bu we need to know the time step
 		// for now I will simply assert 
 		_ASSERTE (0);
-	} else {
+	}
+	else if(action_type==PINT_ACTION_IMPULSE)
+	{
 		NewtonBodyApplyImpulseArray (body, 1, sizeof (Point), &action.x, &pos[0]);
 	}
+}*/
 
+void NewtonPint::AddWorldImpulseAtWorldPos(PintObjectHandle handle, const Point& world_impulse, const Point& world_pos)
+{
+	NewtonBody* const body = (NewtonBody*)handle;
+	NewtonBodyApplyImpulseArray(body, 1, sizeof(Point), &world_impulse.x, &world_pos[0]);
+}
+
+/*void NewtonPint::AddLocalTorque(PintObjectHandle handle, const Point& local_torque)
+{
+	NewtonBody* const body = (NewtonBody*)handle;
+
+	PinkRigidBodyCookie* const cookie = (PinkRigidBodyCookie*) NewtonBodyGetUserData(body);
+	cookie->mTorque += dVector(local_torque.x, local_torque.y, local_torque.z);
+}*/
+
+Point NewtonPint::GetAngularVelocity(PintObjectHandle handle)
+{
+	NewtonBody* const body = (NewtonBody*)handle;
+	dFloat Omega[3];
+	NewtonBodyGetOmega(body, Omega);
+	return Point(Omega[0], Omega[1], Omega[2]);
+}
+
+void NewtonPint::SetAngularVelocity(PintObjectHandle handle, const Point& angular_velocity)
+{
+	NewtonBody* const body = (NewtonBody*)handle;
+	NewtonBodySetOmega(body, &angular_velocity.x);
+}
+
+float NewtonPint::GetMass(PintObjectHandle handle)
+{
+	NewtonBody* const body = (NewtonBody*)handle;
+
+	dFloat Mass, Ixx, Iyy, Izz;
+	NewtonBodyGetMassMatrix(body, &Mass, &Ixx, &Iyy, &Izz);
+
+	return Mass;
+}
+
+Point NewtonPint::GetLocalInertia(PintObjectHandle handle)
+{
+	NewtonBody* const body = (NewtonBody*)handle;
+
+	dFloat Mass, Ixx, Iyy, Izz;
+	NewtonBodyGetMassMatrix(body, &Mass, &Ixx, &Iyy, &Izz);
+
+	return Point(Ixx, Iyy, Izz);
 }
 
 
-static Newton* gNewton = null;
+static NewtonPint* gNewton = null;
 static void gNewton_GetOptionsFromGUI();
 
 void Newton_Init(const PINT_WORLD_CREATE& desc)
@@ -813,7 +900,7 @@ void Newton_Init(const PINT_WORLD_CREATE& desc)
 	gNewton_GetOptionsFromGUI();
 
 	ASSERT(!gNewton);
-	gNewton = ICE_NEW(Newton);
+	gNewton = ICE_NEW(NewtonPint);
 	gNewton->Init(desc);
 }
 
@@ -827,7 +914,7 @@ void Newton_Close()
 	}
 }
 
-Newton* GetNewton()
+NewtonPint* GetNewton()
 {
 	return gNewton;
 }

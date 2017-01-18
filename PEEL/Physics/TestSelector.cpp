@@ -137,12 +137,17 @@ PhysicsTest* RenderTestSelector(const GLFontRenderer& texter, float x, float tex
 				"(API)",
 				"(behavior)",
 				"(contact generation)",
+				"(joints)",
+				"(articulations)",
 				"(performance)",
+				"(kinematics)",
+				"(CCD)",
+				"(vehicles)",
 				"(raycast)",
 				"(sweep)",
 				"(overlap)",
-				"(CCD)",
 				"(static scene)",
+				"(work in progress)",
 			};
 
 			const TestCategory TC = Test->GetCategory();

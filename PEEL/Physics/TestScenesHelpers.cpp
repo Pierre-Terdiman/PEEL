@@ -14,6 +14,7 @@
 #include "PintObjectsManager.h"
 #include "TestScenes.h"
 #include "ProgressBar.h"
+#include "Cylinder.h"
 
 static bool gRotateMeshes = false;
 
@@ -77,8 +78,7 @@ bool CreateBoxStack(Pint& pint, const PintCaps& caps, const udword nb_stacks, ud
 
 	const float BoxExtent = 1.0f;
 
-	PINT_BOX_CREATE BoxDesc;
-	BoxDesc.mExtents	= Point(BoxExtent, BoxExtent, BoxExtent);
+	PINT_BOX_CREATE BoxDesc(BoxExtent, BoxExtent, BoxExtent);
 	BoxDesc.mRenderer	= CreateBoxRenderer(BoxDesc.mExtents);
 
 	const udword NbStacks = nb_stacks;
@@ -115,12 +115,10 @@ bool CreateBoxStack(Pint& pint, const PintCaps& caps, const udword nb_stacks, ud
 
 void CreateBoxContainer(Pint& pint, float box_height, float box_side, float box_depth)
 {
-	PINT_BOX_CREATE BoxDesc0;
-	BoxDesc0.mExtents		= Point(box_side, box_height, box_depth);
+	PINT_BOX_CREATE BoxDesc0(box_side, box_height, box_depth);
 	BoxDesc0.mRenderer		= CreateBoxRenderer(BoxDesc0.mExtents);
 
-	PINT_BOX_CREATE BoxDesc1;
-	BoxDesc1.mExtents		= Point(box_depth, box_height, box_side);
+	PINT_BOX_CREATE BoxDesc1(box_depth, box_height, box_side);
 	BoxDesc1.mRenderer		= CreateBoxRenderer(BoxDesc1.mExtents);
 
 	PINT_OBJECT_CREATE ObjectDesc;
@@ -249,7 +247,6 @@ bool CreateSeaOfStaticConvexes(Pint& pint, const PintCaps& caps, udword nb_x, ud
 	if(!caps.mSupportConvexes)
 		return false;
 
-	PINT_CONVEX_CREATE ConvexCreate;
 	MyConvex C;
 //	udword i=2;	// Small convexes
 	udword i=4;	// 'Big' convexes
@@ -257,8 +254,7 @@ bool CreateSeaOfStaticConvexes(Pint& pint, const PintCaps& caps, udword nb_x, ud
 //	udword i=13;
 	C.LoadFile(i);
 
-	ConvexCreate.mNbVerts	= C.mNbVerts;
-	ConvexCreate.mVerts		= C.mVerts;
+	PINT_CONVEX_CREATE ConvexCreate(C.mNbVerts, C.mVerts);
 	ConvexCreate.mRenderer	= CreateConvexRenderer(ConvexCreate.mNbVerts, ConvexCreate.mVerts);
 
 	const float Scale = 3.0f;
@@ -356,9 +352,7 @@ bool CreateTestScene_ConvexStack_Generic(Pint& pint, udword NbX, udword NbY, udw
 	udword NbPts = GenerateConvex(Pts, NbInsideCirclePts, NbOutsideCirclePts, 2.0f, 3.0f, 2.0f);
 	ASSERT(NbPts==TotalNbVerts);
 
-	PINT_CONVEX_CREATE ConvexCreate;
-	ConvexCreate.mNbVerts	= TotalNbVerts;
-	ConvexCreate.mVerts		= Pts;
+	PINT_CONVEX_CREATE ConvexCreate(TotalNbVerts, Pts);
 	ConvexCreate.mRenderer	= CreateConvexRenderer(TotalNbVerts, Pts);
 
 	for(udword j=0;j<NbLayers;j++)
@@ -394,9 +388,7 @@ void GenerateConvexPile(Pint& pint, udword NbX, udword NbY, udword NbLayers, flo
 		Pts[i] *= Amplitude;
 	}
 
-	PINT_CONVEX_CREATE ConvexCreate;
-	ConvexCreate.mNbVerts	= NbRandomPts;
-	ConvexCreate.mVerts		= Pts;
+	PINT_CONVEX_CREATE ConvexCreate(NbRandomPts, Pts);
 	ConvexCreate.mRenderer	= CreateConvexRenderer(NbRandomPts, Pts);
 
 	for(udword j=0;j<NbLayers;j++)
@@ -422,8 +414,8 @@ void GenerateConvexPile(Pint& pint, udword NbX, udword NbY, udword NbLayers, flo
 
 bool CreateArrayOfDynamicConvexes(Pint& pint, const PINT_CONVEX_CREATE& convex_create, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_y, const Point* offset, const Point* lin_vel)
 {
-	const float OneOverNbX = 1.0f / float(nb_x-1);
-	const float OneOverNbY = 1.0f / float(nb_y-1);
+	const float OneOverNbX = OneOverNb(nb_x);
+	const float OneOverNbY = OneOverNb(nb_y);
 	for(udword y=0;y<nb_y;y++)
 	{
 		const float CoeffY = 2.0f * ((float(y)*OneOverNbY) - 0.5f);
@@ -451,8 +443,8 @@ static bool GenerateArrayOfShapes(Pint& pint, const PINT_SHAPE_CREATE* shape, ud
 	ObjectDesc.mMass			= mass;
 	ObjectDesc.mCollisionGroup	= group;
 
-	const float OneOverNbX = 1.0f / float(nb_x-1);
-	const float OneOverNbY = 1.0f / float(nb_y-1);
+	const float OneOverNbX = OneOverNb(nb_x);
+	const float OneOverNbY = OneOverNb(nb_y);
 	for(udword y=0;y<nb_y;y++)
 	{
 		const float CoeffY = 2.0f * ((float(y)*OneOverNbY) - 0.5f);
@@ -475,8 +467,7 @@ static bool GenerateArrayOfShapes(Pint& pint, const PINT_SHAPE_CREATE* shape, ud
 
 bool GenerateArrayOfSpheres(Pint& pint, float radius, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_z, float mass, PintCollisionGroup group, const Point* offset)
 {
-	PINT_SPHERE_CREATE SphereDesc;
-	SphereDesc.mRadius		= radius;
+	PINT_SPHERE_CREATE SphereDesc(radius);
 	SphereDesc.mRenderer	= CreateSphereRenderer(radius);
 
 	return GenerateArrayOfShapes(pint, &SphereDesc, nb_x, nb_y, altitude, scale_x, scale_z, mass, group, offset);
@@ -484,22 +475,19 @@ bool GenerateArrayOfSpheres(Pint& pint, float radius, udword nb_x, udword nb_y, 
 
 ///////////////////////////////////////////////////////////////////////////////
 
-bool GenerateArrayOfBoxes(Pint& pint, const Point& extents, udword nb_x, udword nb_y, float altitude, float scale, float mass, PintCollisionGroup group)
+bool GenerateArrayOfBoxes(Pint& pint, const Point& extents, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_z, float mass, PintCollisionGroup group, const Point* offset)
 {
-	PINT_BOX_CREATE BoxDesc;
-	BoxDesc.mExtents	= extents;
+	PINT_BOX_CREATE BoxDesc(extents);
 	BoxDesc.mRenderer	= CreateBoxRenderer(extents);
 
-	return GenerateArrayOfShapes(pint, &BoxDesc, nb_x, nb_y, altitude, scale, scale, mass, group, null);
+	return GenerateArrayOfShapes(pint, &BoxDesc, nb_x, nb_y, altitude, scale_x, scale_z, mass, group, offset);
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
 bool GenerateArrayOfCapsules(Pint& pint, float radius, float half_height, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_z, float mass, PintCollisionGroup group, const Point* offset)
 {
-	PINT_CAPSULE_CREATE CapsuleDesc;
-	CapsuleDesc.mRadius		= radius;
-	CapsuleDesc.mHalfHeight	= half_height;
+	PINT_CAPSULE_CREATE CapsuleDesc(radius, half_height);
 	CapsuleDesc.mRenderer	= CreateCapsuleRenderer(radius, half_height*2.0f);
 
 	return GenerateArrayOfShapes(pint, &CapsuleDesc, nb_x, nb_y, altitude, scale_x, scale_z, mass, group, offset);
@@ -512,7 +500,6 @@ bool GenerateArrayOfConvexes(Pint& pint, const PintCaps& caps, bool is_static, f
 	if(!caps.mSupportConvexes)
 		return false;
 
-	PINT_CONVEX_CREATE ConvexCreate;
 	MyConvex C;
 	const udword i=convex_id;
 //	udword i=2;	// Small convexes
@@ -521,13 +508,12 @@ bool GenerateArrayOfConvexes(Pint& pint, const PintCaps& caps, bool is_static, f
 //	udword i=13;
 	C.LoadFile(i);
 
-	ConvexCreate.mNbVerts	= C.mNbVerts;
-	ConvexCreate.mVerts		= C.mVerts;
+	PINT_CONVEX_CREATE ConvexCreate(C.mNbVerts, C.mVerts);
 	ConvexCreate.mRenderer	= CreateConvexRenderer(ConvexCreate.mNbVerts, ConvexCreate.mVerts);
 
 	const float AltitudeC = 10.0f;
-	const float OneOverNbX = 1.0f / float(nb_x-1);
-	const float OneOverNbY = 1.0f / float(nb_y-1);
+	const float OneOverNbX = OneOverNb(nb_x);
+	const float OneOverNbY = OneOverNb(nb_y);
 	for(udword y=0;y<nb_y;y++)
 	{
 		const float CoeffY = 2.0f * ((float(y)*OneOverNbY) - 0.5f);
@@ -570,7 +556,7 @@ bool GenerateArrayOfObjects(Pint& pint, const PintCaps& caps, PintShape type, ud
 	else if(type==PINT_SHAPE_BOX)
 	{
 		const float Radius = 0.5f;
-		return GenerateArrayOfBoxes(pint, Point(Radius, Radius, Radius), nb_x, nb_y, altitude, scale, mass);
+		return GenerateArrayOfBoxes(pint, Point(Radius, Radius, Radius), nb_x, nb_y, altitude, scale, scale, mass);
 	}
 	else if(type==PINT_SHAPE_CONVEX)
 	{
@@ -595,8 +581,7 @@ bool Dominos_Setup(Pint& pint, const PintCaps& caps, float friction)
 	MatDesc.mDynamicFriction	= friction;
 	MatDesc.mRestitution		= 0.0f;
 
-	PINT_BOX_CREATE BoxDesc;
-	BoxDesc.mExtents	= Extents;
+	PINT_BOX_CREATE BoxDesc(Extents);
 	BoxDesc.mRenderer	= CreateBoxRenderer(Extents);
 	BoxDesc.mMaterial	= &MatDesc;
 
@@ -648,17 +633,13 @@ bool Setup_PotPourri_Raycasts(Pint& pint, const PintCaps& caps, float mass, udwo
 	float yy = CapsuleRadius;
 	BasicRandom Rnd(42);
 
-	PINT_SPHERE_CREATE SphereDesc;
-	SphereDesc.mRadius		= SphereRadius;
+	PINT_SPHERE_CREATE SphereDesc(SphereRadius);
 	SphereDesc.mRenderer	= CreateSphereRenderer(SphereRadius);
 
-	PINT_BOX_CREATE BoxDesc;
-	BoxDesc.mExtents	= Point(CapsuleRadius, CapsuleRadius, CapsuleRadius);
+	PINT_BOX_CREATE BoxDesc(CapsuleRadius, CapsuleRadius, CapsuleRadius);
 	BoxDesc.mRenderer	= CreateBoxRenderer(BoxDesc.mExtents);
 
-	PINT_CAPSULE_CREATE CapsuleDesc;
-	CapsuleDesc.mRadius		= CapsuleRadius;
-	CapsuleDesc.mHalfHeight	= HalfHeight;
+	PINT_CAPSULE_CREATE CapsuleDesc(CapsuleRadius, HalfHeight);
 	CapsuleDesc.mRenderer	= CreateCapsuleRenderer(CapsuleRadius, HalfHeight*2.0f);
 
 	for(udword k=0;k<nb_layers;k++)
@@ -800,7 +781,7 @@ static void TessellateTriangle(udword& nb_new_tris, const Triangle& tr, Triangle
 	};
 }
 
-bool CreateMeshesFromRegisteredSurfaces(Pint& pint, const PintCaps& caps, const TestBase& test)
+bool CreateMeshesFromRegisteredSurfaces(Pint& pint, const PintCaps& caps, const TestBase& test, const PINT_MATERIAL_CREATE* material)
 {
 	if(!caps.mSupportMeshes)
 		return false;
@@ -849,6 +830,7 @@ bool CreateMeshesFromRegisteredSurfaces(Pint& pint, const PintCaps& caps, const 
 			MeshDesc.mSurface.mNbVerts	= NewTris.GetNbTriangles()*3;
 			MeshDesc.mSurface.mVerts	= NewTris.GetTriangles()->mVerts;
 			MeshDesc.mRenderer			= CreateMeshRenderer(MeshDesc.mSurface);
+			MeshDesc.mMaterial			= material;
 
 			PINT_OBJECT_CREATE ObjectDesc;
 			ObjectDesc.mShapes		= &MeshDesc;
@@ -872,6 +854,7 @@ bool CreateMeshesFromRegisteredSurfaces(Pint& pint, const PintCaps& caps, const 
 			PINT_MESH_CREATE MeshDesc;
 			MeshDesc.mSurface	= IS->GetSurfaceInterface();
 			MeshDesc.mRenderer	= CreateMeshRenderer(MeshDesc.mSurface);
+			MeshDesc.mMaterial	= material;
 
 			PINT_OBJECT_CREATE ObjectDesc;
 			ObjectDesc.mShapes		= &MeshDesc;
@@ -937,6 +920,7 @@ bool CreateMeshesFromRegisteredSurfaces(Pint& pint, const PintCaps& caps, const 
 		PINT_MESH_CREATE MeshDesc;
 		MeshDesc.mSurface	= Merged.GetSurfaceInterface();
 		MeshDesc.mRenderer	= CreateMeshRenderer(MeshDesc.mSurface);
+		MeshDesc.mMaterial	= material;
 
 		PINT_OBJECT_CREATE ObjectDesc;
 		ObjectDesc.mShapes		= &MeshDesc;
@@ -1073,6 +1057,7 @@ bool CreateMeshesFromRegisteredSurfaces(Pint& pint, const PintCaps& caps, const 
 				PINT_MESH_CREATE MeshDesc;
 				MeshDesc.mSurface	= GridMesh.GetSurfaceInterface();
 				MeshDesc.mRenderer	= CreateMeshRenderer(MeshDesc.mSurface);
+				MeshDesc.mMaterial	= material;
 
 				PINT_OBJECT_CREATE ObjectDesc;
 				ObjectDesc.mShapes		= &MeshDesc;
@@ -1099,7 +1084,7 @@ bool CreateMeshesFromRegisteredSurfaces(Pint& pint, const PintCaps& caps, const 
 
 ///////////////////////////////////////////////////////////////////////////////
 
-void CreatePlanarMesh(TestBase& test, Pint& pint, float altitude)
+PintObjectHandle CreatePlanarMesh(TestBase& test, Pint& pint, float altitude, udword nb, float scale, const PINT_MATERIAL_CREATE* material)
 {
 	IndexedSurface* IS;
 	if(test.GetNbSurfaces())
@@ -1109,21 +1094,723 @@ void CreatePlanarMesh(TestBase& test, Pint& pint, float altitude)
 	else
 	{
 		IS = test.CreateManagedSurface();
-		bool status = IS->MakePlane(32, 32);
+		bool status = IS->MakePlane(nb, nb);
 		ASSERT(status);
-		IS->Scale(Point(0.1f, 1.0f, 0.1f));
+		IS->Scale(Point(scale, 1.0f, scale));
 		IS->Flip();
 	}
 
 	PINT_MESH_CREATE MeshDesc;
 	MeshDesc.mSurface	= IS->GetSurfaceInterface();
 	MeshDesc.mRenderer	= CreateMeshRenderer(MeshDesc.mSurface);
+	MeshDesc.mMaterial	= material;
 
 	PINT_OBJECT_CREATE ObjectDesc;
 	ObjectDesc.mShapes		= &MeshDesc;
 	ObjectDesc.mPosition	= Point(0.0f, altitude, 0.0f);
 	ObjectDesc.mMass		= 0.0f;
-	CreatePintObject(pint, ObjectDesc);
+	return CreatePintObject(pint, ObjectDesc);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+#ifdef REMOVED
+static bool CreateRope(	Pint& pint, PintObjectHandle articulation, PintObjectHandle parent,
+						const Point& p0, const Point& p1, udword nb_capsules, float capsule_radius, float capsule_mass,
+						/*bool articulation,*/ bool overlapping_links, bool create_distance_constraints, PintObjectHandle* handles=null, float* half_height=null, Quat* qq=null)
+{
+	if(nb_capsules>MAX_LINKS)
+		return false;
+
+//	PintObjectHandle Articulation = articulation ? pint.CreateArticulation() : null;
+
+	const Point Dir = (p1 - p0).Normalize();
+
+	float Offset;
+	float HalfHeight;
+	Point Extents;
+	if(!overlapping_links)
+	{
+		const float TotalLength = p0.Distance(p1);
+		// <===TotalLength====>
+		// (=*=)(=*=)(=*=)(=*=)
+		// We divide TotalLength in N equal parts.
+		const float LinkLength = TotalLength/float(nb_capsules);
+		//    LinkLength = (Radius + HalfHeight)*2
+		//<=> HalfHeight = (LinkLength/2) - Radius
+		HalfHeight = LinkLength*0.5f - capsule_radius;
+		if(HalfHeight<0.0f)
+			return false;
+		Offset = capsule_radius + HalfHeight;
+		Extents = Dir * (capsule_radius + HalfHeight);
+	}
+	else
+	{
+/* TODO
+		float TotalLength = p0.Distance(p1);
+		// <====TotalLength====>
+		// (=*=X=*=X=*=X=*=X=*=)
+		// Remove start & end radius from total length:
+		TotalLength -= capsule_radius*2.0f;
+		if(TotalLength<0.0f)
+			return false;
+		// <===TotalLength===>
+		// =*=X=*=X=*=X=*=X=*=
+
+		//    LinkLength = (Radius + HalfHeight)*2
+		//<=> HalfHeight = (LinkLength/2) - Radius
+*/
+	}
+
+//	const Quat qXtoY = ShortestRotation(Point(1.0f, 0.0f, 0.0f), Point(0.0f, 1.0f, 0.0f));
+	const Quat qToDir = ShortestRotation(Point(0.0f, 1.0f, 0.0f), Dir);
+	if(qq)
+		*qq = qToDir;
+
+	if(half_height)
+		*half_height = HalfHeight;
+
+	PINT_CAPSULE_CREATE CapsuleDesc(capsule_radius, HalfHeight);
+//	CapsuleDesc.mLocalRot	= qXtoY;
+	CapsuleDesc.mRenderer	= CreateCapsuleRenderer(capsule_radius, HalfHeight*2.0f);
+
+	PINT_OBJECT_CREATE ObjectDesc;
+	ObjectDesc.mShapes		= &CapsuleDesc;
+	ObjectDesc.mMass		= capsule_mass;
+	ObjectDesc.mRotation	= qToDir;
+
+	PintObjectHandle Handles[MAX_LINKS];
+	Point Positions[MAX_LINKS];
+
+	Point Pos = p0 + Offset*Dir;
+
+//	udword GroupBit = 0;	###
+	for(udword i=0;i<nb_capsules;i++)
+	{
+		Positions[i] = Pos;
+		{
+			ObjectDesc.mPosition		= Pos;
+//			ObjectDesc.mCollisionGroup	= 1 + GroupBit;	GroupBit = 1 - GroupBit;	###
+			if(articulation)
+			{
+				PINT_ARTICULATED_BODY_CREATE ArticulatedDesc;
+				ArticulatedDesc.mParent = i ? Handles[i-1] : parent;
+				ArticulatedDesc.mLocalPivot0 = Extents;
+				ArticulatedDesc.mLocalPivot1 = -Extents;
+				Handles[i] = pint.CreateArticulatedObject(ObjectDesc, ArticulatedDesc, articulation);
+			}
+			else
+			{
+				Handles[i] = CreatePintObject(pint, ObjectDesc);
+				if(i)
+				{
+					PINT_SPHERICAL_JOINT_CREATE Desc;
+					Desc.mObject0		= Handles[i-1];
+					Desc.mObject1		= Handles[i];
+					Desc.mLocalPivot0	= Extents;
+					Desc.mLocalPivot1	= -Extents;
+					PintJointHandle JointHandle = pint.CreateJoint(Desc);
+					ASSERT(JointHandle);
+				}
+			}
+			if(handles)
+				handles[i] = Handles[i];
+		}
+		Pos += Extents*2.0f;
+	}
+
+//	if(Articulation)
+//		pint.AddArticulationToScene(Articulation);
+
+	if(1)
+	{
+		if(0)
+		{
+			udword i=nb_capsules-2;
+			PINT_DISTANCE_JOINT_CREATE Desc;
+			Desc.mObject0		= Handles[0];
+			Desc.mObject1		= Handles[i];
+			Desc.mDistance		= Positions[i].Distance(Positions[0]);
+			PintJointHandle JointHandle = pint.CreateJoint(Desc);
+			ASSERT(JointHandle);
+		}
+
+		if(create_distance_constraints)
+		{
+			for(udword i=0;i<nb_capsules;i++)
+			{
+				if(i+2<nb_capsules)
+				{
+					PINT_DISTANCE_JOINT_CREATE Desc;
+					Desc.mObject0		= Handles[i];
+					Desc.mObject1		= Handles[i+2];
+					Desc.mDistance		= Positions[i].Distance(Positions[i+2]);
+					PintJointHandle JointHandle = pint.CreateJoint(Desc);
+					ASSERT(JointHandle);
+				}
+			}
+		}
+
+		if(0)
+		{
+			for(udword i=1;i<nb_capsules;i++)
+			{
+				PINT_DISTANCE_JOINT_CREATE Desc;
+				Desc.mObject0		= Handles[0];
+				Desc.mObject1		= Handles[i];
+				Desc.mDistance		= Positions[0].Distance(Positions[i]);
+				PintJointHandle JointHandle = pint.CreateJoint(Desc);
+				ASSERT(JointHandle);
+			}
+		}
+	}
+	return true;
+}
+
+/*static bool CreateRope(Pint& pint, const Point& p0, const Point& p1, udword nb_capsules, float capsule_radius, float capsule_mass, bool articulation, bool overlapping_links, bool create_distance_constraints, PintObjectHandle* handles=null, float* half_height=null)
+{
+//	PintObjectHandle Articulation = articulation ? pint.CreateArticulation() : null;
+	return CreateRope(pint, articulation, p0, p1, nb_capsules, capsule_radius, capsule_mass, articulation, overlapping_links, create_distance_constraints, handles, half_height);
+//	if(Articulation)
+//		pint.AddArticulationToScene(Articulation);
+}*/
+#endif
+
+bool CreateCapsuleRope(	Pint& pint, PintObjectHandle articulation, PintObjectHandle parent,
+						float capsule_radius, float half_height, float capsule_mass, float capsule_mass_for_inertia,
+						const Point& capsule_dir, const Point& start_pos, udword nb_capsules,
+						bool create_distance_constraints, PintObjectHandle* handles, const PintCollisionGroup* collision_groups)
+{
+	if(nb_capsules>MAX_LINKS)
+		return false;
+
+	const Quat qToDir = ShortestRotation(Point(0.0f, 1.0f, 0.0f), capsule_dir);
+
+	PINT_CAPSULE_CREATE CapsuleDesc(capsule_radius, half_height);
+	CapsuleDesc.mRenderer	= CreateCapsuleRenderer(capsule_radius, half_height*2.0f);
+
+	PINT_OBJECT_CREATE ObjectDesc;
+	ObjectDesc.mShapes			= &CapsuleDesc;
+	ObjectDesc.mMass			= capsule_mass;
+	ObjectDesc.mMassForInertia	= capsule_mass_for_inertia;
+	ObjectDesc.mRotation		= qToDir;
+
+	Point CapsulePos = start_pos + capsule_dir*(capsule_radius+half_height);
+	const Point CapsuleOffset(0.0f, capsule_radius+half_height, 0.0f);
+
+#ifdef SETUP_ROPE_COLLISION_GROUPS
+	udword GroupBit = 0;
+#endif
+
+	PintObjectHandle Handles[MAX_LINKS];
+	Point Positions[MAX_LINKS];
+	for(udword i=0;i<nb_capsules;i++)
+	{
+#ifdef SETUP_ROPE_COLLISION_GROUPS
+		ObjectDesc.mCollisionGroup	= 1 + GroupBit;	GroupBit = 1 - GroupBit;
+#endif
+		if(collision_groups)
+			ObjectDesc.mCollisionGroup = collision_groups[i];
+
+		ObjectDesc.mPosition = Positions[i] = CapsulePos;
+		CapsulePos += capsule_dir*(capsule_radius+half_height)*2.0f;
+		if(articulation)
+		{
+			PINT_ARTICULATED_BODY_CREATE ArticulatedDesc;
+			ArticulatedDesc.mParent = i ? Handles[i-1] : parent;
+			ArticulatedDesc.mLocalPivot0 = CapsuleOffset;
+			ArticulatedDesc.mLocalPivot1 = -CapsuleOffset;
+			Handles[i] = pint.CreateArticulatedObject(ObjectDesc, ArticulatedDesc, articulation);
+		}
+		else
+			Handles[i] = CreatePintObject(pint, ObjectDesc);
+		if(handles)
+			handles[i] = Handles[i];
+	}
+
+	if(!articulation)
+	{
+		if(parent)
+		{
+			PintJointHandle JointHandle = pint.CreateJoint(PINT_SPHERICAL_JOINT_CREATE(parent, Handles[0], CapsuleOffset, -CapsuleOffset));
+			ASSERT(JointHandle);
+		}
+
+//		for(udword j=0;j<32;j++)
+		{
+			for(udword i=1;i<nb_capsules;i++)
+			{
+				PintJointHandle JointHandle = pint.CreateJoint(PINT_SPHERICAL_JOINT_CREATE(Handles[i-1], Handles[i], CapsuleOffset, -CapsuleOffset));
+				ASSERT(JointHandle);
+			}
+		}
+	}
+
+	if(1)
+	{
+		if(0)
+		{
+			udword i=nb_capsules-2;
+			PINT_DISTANCE_JOINT_CREATE Desc;
+			Desc.mObject0		= Handles[0];
+			Desc.mObject1		= Handles[i];
+			Desc.mMaxDistance	= Positions[i].Distance(Positions[0]);
+			PintJointHandle JointHandle = pint.CreateJoint(Desc);
+			ASSERT(JointHandle);
+		}
+
+		if(create_distance_constraints)
+		{
+			for(udword i=0;i<nb_capsules;i++)
+			{
+				if(i+2<nb_capsules)
+				{
+					PINT_DISTANCE_JOINT_CREATE Desc;
+					Desc.mObject0		= Handles[i];
+					Desc.mObject1		= Handles[i+2];
+					Desc.mMaxDistance	= Positions[i].Distance(Positions[i+2]);
+					PintJointHandle JointHandle = pint.CreateJoint(Desc);
+					ASSERT(JointHandle);
+				}
+			}
+		}
+
+		if(0)
+		{
+			for(udword i=1;i<nb_capsules;i++)
+			{
+				PINT_DISTANCE_JOINT_CREATE Desc;
+				Desc.mObject0		= Handles[0];
+				Desc.mObject1		= Handles[i];
+				Desc.mMaxDistance	= Positions[0].Distance(Positions[i]);
+				PintJointHandle JointHandle = pint.CreateJoint(Desc);
+				ASSERT(JointHandle);
+			}
+		}
+	}
+	return true;
+}
+
+bool CreateCapsuleRope2(Pint& pint, float& half_height, PintObjectHandle articulation, PintObjectHandle parent,
+						const Point& p0, const Point& p1, udword nb_capsules,
+						float capsule_radius, float capsule_mass, float capsule_mass_for_inertia,
+						bool /*overlapping_links*/, bool create_distance_constraints, PintObjectHandle* handles, const PintCollisionGroup* collision_groups)
+{
+	const Point CapsuleDir = (p1 - p0).Normalize();
+
+	float Offset;
+	float HalfHeight;
+//	Point Extents;
+//	if(!overlapping_links)
+	{
+		const float TotalLength = p0.Distance(p1);
+		// <===TotalLength====>
+		// (=*=)(=*=)(=*=)(=*=)
+		// We divide TotalLength in N equal parts.
+		const float LinkLength = TotalLength/float(nb_capsules);
+		//    LinkLength = (Radius + HalfHeight)*2
+		//<=> HalfHeight = (LinkLength/2) - Radius
+		HalfHeight = LinkLength*0.5f - capsule_radius;
+		if(HalfHeight<0.0f)
+			return false;
+		Offset = capsule_radius + HalfHeight;
+//		Extents = CapsuleDir * (capsule_radius + HalfHeight);
+	}
+
+	half_height = HalfHeight;
+
+	const Point StartPos = p0;// + Extents;
+
+	return CreateCapsuleRope(pint, articulation, parent, capsule_radius, HalfHeight, capsule_mass, capsule_mass_for_inertia, CapsuleDir, StartPos, nb_capsules, create_distance_constraints, handles, collision_groups);
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+// This one is unfinished & old. Not properly tuned or optimized or anything, etc.
+// TODO: refactor with new one in Bulldozer demo
+void CreateCaterpillarTrack_OLD(Pint& pint, CaterpillarTrackObjects& objects, PINT_MATERIAL_CREATE* material, const Point& pos,
+						 const CylinderMesh& mCylinder, PintShapeRenderer* cylinder_renderer,
+						 const CylinderMesh& mCylinder2, PintShapeRenderer* cylinder_renderer2
+						 )
+{
+	//### TODO: we really need an editor for all these params
+
+	PINT_MATERIAL_CREATE FrictionlessMaterial;
+	FrictionlessMaterial.mStaticFriction	= 0.0f;
+	FrictionlessMaterial.mDynamicFriction	= 0.0f;
+	FrictionlessMaterial.mRestitution		= 0.0f;
+
+	const float Radius = 4.0f;
+//	const float Altitude = 2.0f;
+//	const float Altitude = pos.y;
+	const float LinkMass = 1.0f;
+	const float GearMass = 10.0f;
+	const float SideMass = 4.0f;
+
+	////
+
+	Curve C;
+//	const udword NbCurvePts = 4;
+	const udword NbCurvePts = 1024;
+//	const udword NbCurvePts = 64;
+//	const udword NbCurvePts = 16;
+	C.Init(NbCurvePts);
+	C.mClosed = true;
+	for(udword i=0;i<NbCurvePts;i++)
+	{
+		const float Coeff = float(i)/float(NbCurvePts);
+		const float Angle = Coeff*TWOPI;
+		const float x = sinf(Angle) * Radius;
+		/*const*/ float y = cosf(Angle) * Radius * 0.5f;
+		const float LimitP = 0.5f*Radius;
+//		const float LimitP = 0.5f*Radius*0.5f;
+		const float LimitN = 0.5f*Radius*0.5f;
+		if(y>LimitP)
+			y=LimitP;
+		if(y<-LimitN)
+			y=-LimitN;
+		C.SetVertex(x, y/*+Altitude*/, 0.0f, i);
+	}
+	const float Length = C.ComputeLength();
+
+	////
+
+//	const udword NbLinks = 48;
+//	const udword NbLinks = 32*2;
+	const udword NbLinks = 32;	//
+//	const udword NbLinks = 64;
+//	const udword NbLinks = 16;
+//	const udword NbLinks = 128;
+//	const float D = PI*Radius/float(NbLinks);
+	const float D = Length*0.5f/float(NbLinks);
+//	const Point Extents(D*0.8f, 0.1f, 1.0f);
+	const Point Extents(D, 0.1f, 1.0f);
+//	const Point ArticulationPos(0.0f, Altitude + Extents.y, 0.0f);
+//	const Point ArticulationPos = pos + Point(0.0f, Extents.y, 0.0f);
+
+	//
+
+	// Main plank
+	PINT_BOX_CREATE BoxDesc(Extents);
+	BoxDesc.mRenderer	= CreateBoxRenderer(BoxDesc.mExtents);
+	BoxDesc.mMaterial	= material;
+	BoxDesc.mMaterial	= &FrictionlessMaterial;
+
+		// Smaller inside box to catch the gear
+		PINT_BOX_CREATE BoxDesc2;
+//		BoxDesc2.mExtents	= Point(Extents.x*0.2f, 0.15f, Extents.z*0.4f);
+		BoxDesc2.mExtents	= Point(Extents.x*0.2f, 0.2f, Extents.z*0.4f);
+		BoxDesc2.mRenderer	= CreateBoxRenderer(BoxDesc2.mExtents);
+		BoxDesc2.mMaterial	= material;
+		BoxDesc2.mMaterial	= &FrictionlessMaterial;		
+		BoxDesc2.mLocalPos	= Point(0.0f, -Extents.y - BoxDesc2.mExtents.y, 0.0f);
+		BoxDesc.mNext		= &BoxDesc2;
+
+		// Left & right upper boxes (will touch the ground)
+		PINT_BOX_CREATE BoxDesc3;
+//		BoxDesc3.mExtents	= Point(Extents.x, 0.15f, 0.1f);
+//		BoxDesc3.mExtents	= Point(Extents.x, 0.3f, 0.1f);
+			BoxDesc3.mExtents	= Point(Extents.x, 0.4f, 0.1f);
+//BoxDesc3.mExtents	= Point(Extents.x, 0.3f, 0.1f);
+		BoxDesc3.mRenderer	= CreateBoxRenderer(BoxDesc3.mExtents);
+		BoxDesc3.mMaterial	= material;
+		BoxDesc3.mLocalPos	= Point(0.0f, BoxDesc3.mExtents.y - Extents.y, Extents.z + BoxDesc3.mExtents.z);
+			BoxDesc3.mLocalPos	= Point(0.0f, 0.0f, Extents.z + BoxDesc3.mExtents.z);
+//		BoxDesc3.mLocalPos	= Point(0.0f, -BoxDesc3.mExtents.y, Extents.z + BoxDesc3.mExtents.z);
+//BoxDesc3.mLocalPos	= Point(0.0f, - BoxDesc3.mExtents.y + Extents.y, Extents.z + BoxDesc3.mExtents.z);
+		BoxDesc2.mNext		= &BoxDesc3;
+
+		PINT_BOX_CREATE BoxDesc4(BoxDesc3.mExtents);
+		BoxDesc4.mRenderer	= BoxDesc3.mRenderer;
+		BoxDesc4.mMaterial	= material;
+		BoxDesc4.mLocalPos	= Point(0.0f, BoxDesc3.mLocalPos.y, -BoxDesc3.mLocalPos.z);
+		BoxDesc3.mNext		= &BoxDesc4;
+
+	PINT_OBJECT_CREATE ObjectDesc;
+	ObjectDesc.mShapes		= &BoxDesc;
+	ObjectDesc.mMass		= LinkMass;
+//	ObjectDesc.mPosition	= ArticulationPos;
+	ObjectDesc.mMassForInertia = LinkMass*10.0f;
+
+	// There are multiple issues with articulations:
+	// - they tend to emulate what a high solver iteration count would do with regular joints. And it turns out
+	// the system explodes easily with regular joints & high counts when things are not properly setup (like not physically possible).
+	// That's the case here with some settings that make the track impossible to actually wrap around the gears, etc.
+	// So using articulations exposes that and explodes.
+	// - then it looks like the default friction doesn't work well with this. It works much better with the other friction modes.......
+	// Looks like a bug in PhysX we'll have to investigate & fix.
+//	PintObjectHandle Articulation = pint.CreateArticulation(PINT_ARTICULATION_CREATE());
+	PintObjectHandle Articulation = null;
+
+	float Angles[128];
+	for(udword i=0;i<NbLinks;i++)
+	{
+		const float Coeff = float(i)/float(NbLinks);
+		Point pts[2];
+		Point tmp;
+		C.GetPoint(tmp, Coeff, pts);
+		const float dx = pts[1].x - pts[0].x;
+		const float dy = pts[1].y - pts[0].y;
+		Angles[i] = atan2f(dy, dx);
+	}
+
+	PintObjectHandle Objects[128];
+	Point Positions[128];
+	PintObjectHandle Parent = null;
+	for(udword i=0;i<NbLinks;i++)
+	{
+		const udword ii = (i)%NbLinks;
+
+		const float Coeff = float(ii)/float(NbLinks);
+
+		Point pts[2];
+		C.GetPoint(ObjectDesc.mPosition, Coeff, pts);
+
+		ObjectDesc.mPosition += pos;
+
+		float Angle2;
+		if(0)
+		{
+			const udword jj = (i+1)%NbLinks;
+			const float NextCoeff = float(jj)/float(NbLinks);
+			Point NextPt;
+			C.GetPoint(NextPt, NextCoeff);
+			const float dx = NextPt.x - ObjectDesc.mPosition.x;
+			const float dy = NextPt.y - ObjectDesc.mPosition.y;
+			Angle2 = atan2f(dy, dx);
+		}
+		if(1)
+		{
+			const float dx = pts[1].x - pts[0].x;
+			const float dy = pts[1].y - pts[0].y;
+			Angle2 = atan2f(dy, dx);
+		}
+		if(0)
+		{
+			const udword j = (i-1)%NbLinks;
+			const udword k = (i+1)%NbLinks;
+			Angle2 = (Angles[i] + Angles[j] + Angles[k])/3.0f;
+		}
+
+		Matrix3x3 Rot;
+//		Rot.RotZ(-Angle);
+		Rot.RotZ(Angle2);
+		ObjectDesc.mRotation = Rot;
+
+		if(Articulation)
+		{
+			PINT_ARTICULATED_BODY_CREATE ArticulatedDesc;
+			if(Parent)
+			{
+				ArticulatedDesc.mParent = Parent;
+				ArticulatedDesc.mLocalPivot0 = Point(D, 0.0f, 0.0f);
+				ArticulatedDesc.mLocalPivot1 = Point(-D, 0.0f, 0.0f);
+			}
+			if(0)
+			{
+				ArticulatedDesc.mX = Point(0.0f, 0.0f, 1.0f);
+				ArticulatedDesc.mEnableTwistLimit = false;
+				ArticulatedDesc.mTwistLowerLimit = -0.001f;
+				ArticulatedDesc.mTwistUpperLimit = 0.001f;
+				ArticulatedDesc.mEnableSwingLimit = true;
+				ArticulatedDesc.mSwingYLimit = 0.001f;
+				ArticulatedDesc.mSwingZLimit = 0.001f;
+			}
+			else
+			{
+				ArticulatedDesc.mEnableTwistLimit = true;
+				ArticulatedDesc.mTwistLowerLimit = -0.001f;
+				ArticulatedDesc.mTwistUpperLimit = 0.001f;
+				ArticulatedDesc.mEnableSwingLimit = true;
+//				ArticulatedDesc.mSwingYLimit = 0.001f;
+				ArticulatedDesc.mSwingZLimit = 0.001f;
+//				ArticulatedDesc.mSwingYLimit = FLT_MAX;
+				ArticulatedDesc.mSwingYLimit = PI - 0.001f;
+			}
+			Parent = pint.CreateArticulatedObject(ObjectDesc, ArticulatedDesc, Articulation);
+		}
+		else
+		{
+			Parent = pint.CreateObject(ObjectDesc);
+		}
+		Objects[i] = Parent;
+		Positions[i] = ObjectDesc.mPosition;
+	}
+	if(Articulation)
+		pint.AddArticulationToScene(Articulation);
+
+	if(Articulation)
+	{
+		PINT_HINGE_JOINT_CREATE Desc;
+		Desc.mObject0		= Objects[0];
+		Desc.mObject1		= Objects[NbLinks-1];
+		Desc.mLocalPivot0	= Point(-D, 0.0f, 0.0f);
+		Desc.mLocalPivot1	= Point(D, 0.0f, 0.0f);
+		Desc.mLocalAxis0	= Point(0.0f, 0.0f, 1.0f);
+		Desc.mLocalAxis1	= Point(0.0f, 0.0f, 1.0f);
+		PintJointHandle JointHandle = pint.CreateJoint(Desc);
+		ASSERT(JointHandle);
+	}
+	else
+	{
+		//### Brute force to get something working. We should tune & optimize this later.
+		const bool UseExtraDistanceConstraints = true;
+		for(udword j=0;j<32;j++)
+		{
+			for(udword i=0;i<NbLinks;i++)
+			{
+				const udword ii = (i)%NbLinks;
+				const udword jj = (i+1)%NbLinks;
+
+				PINT_HINGE_JOINT_CREATE Desc;
+				Desc.mObject0		= Objects[ii];
+				Desc.mObject1		= Objects[jj];
+				Desc.mLocalPivot0	= Point(D, 0.0f, 0.0f);
+				Desc.mLocalPivot1	= Point(-D, 0.0f, 0.0f);
+				Desc.mLocalAxis0	= Point(0.0f, 0.0f, 1.0f);
+				Desc.mLocalAxis1	= Point(0.0f, 0.0f, 1.0f);
+				PintJointHandle JointHandle = pint.CreateJoint(Desc);
+				ASSERT(JointHandle);
+			}
+			if(UseExtraDistanceConstraints)
+			{
+				for(udword i=0;i<NbLinks;i++)
+				{
+					const udword ii = (i)%NbLinks;
+					const udword jj = (i+2)%NbLinks;
+
+					PINT_DISTANCE_JOINT_CREATE Desc;
+					Desc.mObject0		= Objects[ii];
+					Desc.mObject1		= Objects[jj];
+	//				Desc.mMaxDistance	= Positions[ii].Distance(Positions[jj]);
+					Desc.mMaxDistance	= Extents.x*2.0f*2.0f;
+					PintJointHandle JointHandle = pint.CreateJoint(Desc);
+					ASSERT(JointHandle);
+				}
+			}
+		}
+	}
+
+	const float NbGears = 3;
+	objects.mNbGears = NbGears;
+//	const float x = Radius - mCylinder.mRadius - 0.005f;
+//	const float x = Radius - mCylinder2.mRadius - 0.1f;
+	const float x = Radius - mCylinder2.mRadius - 0.075f;
+//	const float x = Radius - mCylinder2.mRadius - 0.05f;
+	PintObjectHandle GearObject[3];
+	const float xs[3] = { x, -x, 0.0f };
+//	const float ys[3] = { 0.0f, 0.0f, 0.0f };
+//	const float ys[3] = { 0.0f, 0.0f, 1.0f };
+	const float ys[3] = { 0.0f, 0.0f, 0.9f };
+//	const float ys[3] = { 0.0f, 0.0f, 1.2f };
+//	const float ys[3] = { 0.0f, 0.0f, 1.1f };
+//	const float ys[3] = { 0.0f, 0.0f, 1.5f };
+	for(udword i=0;i<NbGears;i++)
+	{
+		PINT_CONVEX_CREATE ConvexCreate(mCylinder.mNbVerts, mCylinder.mVerts);
+		ConvexCreate.mRenderer	= cylinder_renderer;
+		ConvexCreate.mMaterial	= material;
+
+		PINT_CONVEX_CREATE ConvexCreate2(mCylinder2.mNbVerts, mCylinder2.mVerts);
+		ConvexCreate2.mRenderer	= cylinder_renderer2;
+		ConvexCreate2.mMaterial	= material;
+		ConvexCreate2.mLocalPos	= Point(0.0f, 0.0f, mCylinder.mHalfHeight+mCylinder2.mHalfHeight);
+		ConvexCreate.mNext = &ConvexCreate2;
+
+		PINT_CONVEX_CREATE ConvexCreate3 = ConvexCreate2;
+		ConvexCreate3.mLocalPos	= Point(0.0f, 0.0f, -mCylinder.mHalfHeight-mCylinder2.mHalfHeight);
+		ConvexCreate2.mNext = &ConvexCreate3;
+
+		PINT_OBJECT_CREATE ObjectDesc;
+		ObjectDesc.mShapes		= &ConvexCreate;
+		ObjectDesc.mMass		= GearMass;
+//		ObjectDesc.mPosition	= Point(xs[i], Altitude, 0.0f);
+		ObjectDesc.mPosition	= pos + Point(xs[i], ys[i], 0.0f);
+		GearObject[i] = CreatePintObject(pint, ObjectDesc);
+		ASSERT(GearObject[i]);
+		objects.mGears[i] = GearObject[i];
+	}
+	{
+		const float Gap = 0.1f;
+		PINT_BOX_CREATE SideBoxDesc(x, 0.3f, 0.1f);
+		SideBoxDesc.mRenderer	= CreateBoxRenderer(SideBoxDesc.mExtents);
+		const float z = mCylinder.mHalfHeight + mCylinder2.mHalfHeight*2.0f + SideBoxDesc.mExtents.z + Gap;
+		SideBoxDesc.mLocalPos	= Point(0.0f, 0.0f, z);
+
+		PINT_BOX_CREATE SideBoxDesc2 = SideBoxDesc;
+		SideBoxDesc2.mLocalPos	= Point(0.0f, 0.0f, -z);
+		SideBoxDesc.mNext = &SideBoxDesc2;
+
+		PINT_OBJECT_CREATE ObjectDesc;
+		ObjectDesc.mShapes		= &SideBoxDesc;
+		ObjectDesc.mMass		= SideMass;
+//		ObjectDesc.mPosition	= Point(0.0f, Altitude, 0.0f);
+		ObjectDesc.mPosition	= pos;
+		PintObjectHandle Handle = CreatePintObject(pint, ObjectDesc);
+		ASSERT(Handle);
+		objects.mChassis = Handle;
+
+		for(udword i=0;i<NbGears;i++)
+		{
+			PINT_HINGE_JOINT_CREATE Desc;
+			Desc.mObject0		= GearObject[i];
+			Desc.mObject1		= Handle;
+			Desc.mLocalPivot0	= Point(0.0f, 0.0f, 0.0f);
+			Desc.mLocalPivot1	= Point(xs[i], ys[i], 0.0f);
+			Desc.mLocalAxis0	= Point(0.0f, 0.0f, 1.0f);
+			Desc.mLocalAxis1	= Point(0.0f, 0.0f, 1.0f);
+			PintJointHandle JointHandle = pint.CreateJoint(Desc);
+			ASSERT(JointHandle);
+		}
+	}
+
+	if(0)
+	{
+		PINT_CONVEX_CREATE ConvexCreate(mCylinder.mNbVerts, mCylinder.mVerts);
+		ConvexCreate.mRenderer	= cylinder_renderer;
+		ConvexCreate.mLocalPos	= Point(x, 0.0f, 0.0f);
+
+		PINT_CONVEX_CREATE ConvexCreate2(mCylinder.mNbVerts, mCylinder.mVerts);
+		ConvexCreate2.mRenderer	= cylinder_renderer;
+		ConvexCreate2.mLocalPos	= Point(-x, 0.0f, 0.0f);
+		ConvexCreate.mNext = &ConvexCreate2;
+
+		PINT_OBJECT_CREATE ObjectDesc;
+		ObjectDesc.mShapes		= &ConvexCreate;
+		ObjectDesc.mMass		= 20.0f;
+//		ObjectDesc.mPosition	= Point(0.0f, Altitude, 0.0f);
+		ObjectDesc.mPosition	= pos;
+		PintObjectHandle Handle = CreatePintObject(pint, ObjectDesc);
+		ASSERT(Handle);
+	}
+}
+
+///////////////////////////////////////////////////////////////////////////////
+
+bool ClampAngularVelocity(Pint& pint, PintObjectHandle wheel_parent, PintObjectHandle wheel, float max_velocity)
+{
+	const Point ParentAngularVelocity = pint.GetAngularVelocity(wheel_parent);
+
+	const Point AngularVelocity = pint.GetAngularVelocity(wheel);
+//	printf("Angular velocity %d: %f %f %f\n", i, AngularVelocity.x, AngularVelocity.y, AngularVelocity.z);
+
+	Point RelativeVelocity = AngularVelocity - ParentAngularVelocity;
+
+//	RelativeVelocity.x = RelativeVelocity.y = 0.0f;
+	bool Clamped = false;
+	if(RelativeVelocity.z>max_velocity)
+	{
+		RelativeVelocity.z = max_velocity;
+		Clamped = true;
+	}
+	else if(RelativeVelocity.z<-max_velocity)
+	{
+		RelativeVelocity.z = -max_velocity;
+		Clamped = true;
+	}
+	if(Clamped)
+		pint.SetAngularVelocity(wheel, RelativeVelocity + ParentAngularVelocity);
+	return Clamped;
 }
 
 ///////////////////////////////////////////////////////////////////////////////

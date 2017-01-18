@@ -9,6 +9,8 @@
 #ifndef PINT_COMMON_BULLET_H
 #define PINT_COMMON_BULLET_H
 
+	#define	BULLET_MAIN_COLOR	Point(1.0f, 1.0f, 0.5f)
+
 	inline_ Point			ToPoint(const btVector3& p)		{ return Point(p.x(), p.y(), p.z());			}
 	inline_ Quat			ToQuat(const btQuaternion& q)	{ return Quat(q.getW(), q.x(), q.y(), q.z());	}
 	inline_ btVector3		ToBtVector3(const Point& p)		{ return btVector3(p.x, p.y, p.z);				}

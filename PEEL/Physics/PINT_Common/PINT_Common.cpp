@@ -9,6 +9,30 @@
 #include "stdafx.h"
 #include "PINT_Common.h"
 
+void Common_GetFromEditBox(float& value, const IceEditBox* edit_box, float min_value, float max_value)
+{
+	if(edit_box)
+	{
+		float Value;
+		bool status = edit_box->GetTextAsFloat(Value);
+		ASSERT(status);
+		ASSERT(Value>=min_value && Value<=max_value);
+		value = Value;
+	}
+}
+
+void Common_GetFromEditBox(udword& value, const IceEditBox* edit_box)
+{
+	if(edit_box)
+	{
+		sdword Value;
+		bool status = edit_box->GetTextAsInt(Value);
+		ASSERT(status);
+		ASSERT(Value>=0);
+		value = udword(Value);
+	}
+}
+
 void Common_CloseGUI(Container*& gui)
 {
 	if(gui)

@@ -10,11 +10,12 @@
 #define PINT_PHYSX33_H
 
 #include "..\Pint.h"
+#include "..\PINT_Common\PINT_CommonPhysX3.h"
 
-	class PhysX : public Pint
+	class PhysX : public SharedPhysX
 	{
 		public:
-													PhysX();
+													PhysX(const EditableParams& params);
 		virtual										~PhysX();
 
 		// Pint
@@ -25,7 +26,6 @@
 #endif
 		virtual	void								GetCaps(PintCaps& caps)	const;
 		virtual	void								Init(const PINT_WORLD_CREATE& desc);
-		virtual	void								SetGravity(const Point& gravity);
 		virtual	void								Close();
 		virtual	udword								Update(float dt);
 		virtual	Point								GetMainColor();
@@ -59,44 +59,19 @@
 		virtual	udword								FindTriangles_MeshBoxOverlap	(PintSQThreadContext context, PintObjectHandle handle, udword nb, const PintBoxOverlapData* overlaps);
 		virtual	udword								FindTriangles_MeshCapsuleOverlap(PintSQThreadContext context, PintObjectHandle handle, udword nb, const PintCapsuleOverlapData* overlaps);
 
-		virtual	PR									GetWorldTransform(PintObjectHandle handle);
-		virtual	void								ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos);
-
 		// XP
 		virtual	udword								GetShapes(PintObjectHandle* shapes, PintObjectHandle handle);
 		virtual	void								SetLocalRot(PintObjectHandle handle, const Quat& q);
-		virtual	bool								GetConvexData(PintObjectHandle handle, PINT_CONVEX_CREATE& data);
 
-		virtual	bool								SetKinematicPose(PintObjectHandle handle, const Point& pos);
-
-		virtual	udword								CreateConvexObject(const PINT_CONVEX_DATA_CREATE& desc);
 		virtual	udword								BatchConvexSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintConvexSweepData* sweeps);
+
+		virtual	PintObjectHandle					CreateAggregate(udword max_size, bool enable_self_collision);
+		virtual	bool								AddToAggregate(PintObjectHandle object, PintObjectHandle aggregate);
+		virtual	bool								AddAggregateToScene(PintObjectHandle aggregate);
 		//~Pint
 
 				void								UpdateFromUI();
 		private:
-				struct ConvexRender
-				{
-					ConvexRender(PxConvexMesh* convexMesh, PintShapeRenderer* renderer) :
-						mConvexMesh	(convexMesh),
-						mRenderer	(renderer)
-					{
-					}
-					PxConvexMesh*					mConvexMesh;
-					PintShapeRenderer*				mRenderer;
-				};
-
-				struct MeshRender
-				{
-					MeshRender(PxTriangleMesh* triMesh, PintShapeRenderer* renderer) :
-						mTriangleMesh	(triMesh),
-						mRenderer		(renderer)
-					{
-					}
-					PxTriangleMesh*					mTriangleMesh;
-					PintShapeRenderer*				mRenderer;
-				};
-
 				struct InternalShape
 				{
 					InternalShape(PxShape* shape, const PxMaterial* material, const PxTransform& local_pose, PxU16 collision_group) :
@@ -170,27 +145,12 @@
 					PxConvexMesh*					mConvexMesh;
 				};
 
-				PxFoundation*						mFoundation;
 				PxProfileZoneManager*				mProfileZoneManager;
-				PxPhysics*							mPhysics;
-				PxCooking*							mCooking;
-				PxScene*							mScene;
-				PxMaterial*							mDefaultMaterial;
-
-
-				std::vector<PxMaterial*>			mMaterials;
-				std::vector<ConvexRender>			mConvexes;
-				std::vector<MeshRender>				mMeshes;
-				PxMaterial*							CreateMaterial(const PINT_MATERIAL_CREATE& desc);
-				PxConvexMesh*						CreateConvexMesh(const Point* verts, udword vertCount, PxConvexFlags flags, PintShapeRenderer* renderer);
-				PxTriangleMesh*						CreateTriangleMesh(const SurfaceInterface& surface, PintShapeRenderer* renderer);
 
 				std::vector<InternalSphereShape>	mSphereShapes;
 				std::vector<InternalBoxShape>		mBoxShapes;
 				std::vector<InternalCapsuleShape>	mCapsuleShapes;
 				std::vector<InternalConvexShape>	mConvexShapes;
-
-				std::vector<PxConvexMesh*>			mConvexObjects;
 
 				PxShape*							CreateSphereShape	(const PINT_SHAPE_CREATE* create, PxRigidActor* actor, const PxSphereGeometry& geometry,		const PxMaterial& material, const PxTransform& local_pose, PxU16 collision_group);
 				PxShape*							CreateBoxShape		(const PINT_SHAPE_CREATE* create, PxRigidActor* actor, const PxBoxGeometry& geometry,			const PxMaterial& material, const PxTransform& local_pose, PxU16 collision_group);

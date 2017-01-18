@@ -18,7 +18,7 @@
 	void	MoveCameraRight();
 	void	MoveCameraLeft();
 	void	RotateCamera(int dx, int dy);
-	void	SetupCameraMatrix();
+	void	SetupCameraMatrix(float z_near=1.0f, float z_far=10000.0f);
 	Point	ComputeWorldRay(int xs, int ys);
 
 #endif

@@ -35,18 +35,6 @@ static inline_ void ComputeShading(RGBAPixel& color, const PintRaycastHit& hit,
 	color.A = 255;
 }
 
-/*static*/ Point ComputeWorldRay(const GLint viewPort[4], const GLdouble modelMatrix[16], const GLdouble projMatrix[16], int xs, int ys)
-{
-	ys = viewPort[3] - ys - 1;
-	GLdouble wx0, wy0, wz0;
-	gluUnProject((GLdouble) xs, (GLdouble) ys, 0.0, modelMatrix, projMatrix, viewPort, &wx0, &wy0, &wz0);
-	GLdouble wx1, wy1, wz1;
-	gluUnProject((GLdouble) xs, (GLdouble) ys, 1.0, modelMatrix, projMatrix, viewPort, &wx1, &wy1, &wz1);
-	Point tmp(float(wx1-wx0), float(wy1-wy0), float(wz1-wz0));
-	tmp.Normalize();
-	return tmp;
-}
-
 udword RaytracingTest(Picture& pic, Pint& pint, udword& total_time, udword screen_width, udword screen_height, udword nb_rays, float max_dist)
 {
 //	max_dist = MAX_FLOAT;
@@ -125,13 +113,6 @@ udword RaytracingTest(Picture& pic, Pint& pint, udword& total_time, udword scree
 			RaycastData[i].mMaxDist = max_dist;
 		}
 
-GLint viewPort[4];
-GLdouble modelMatrix[16];
-GLdouble projMatrix[16];
-glGetIntegerv(GL_VIEWPORT, viewPort);
-glGetDoublev(GL_MODELVIEW_MATRIX, modelMatrix);
-glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
-
 //#define COLLECT_BLACK_PIXELS
 #ifdef COLLECT_BLACK_PIXELS
 		Vertices BlackRays;
@@ -142,16 +123,19 @@ glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
 			for(udword i=0;i<RAYTRACING_RENDER_WIDTH;i++)
 			{
 				const udword xi = udword(fScreenWidth*float(i));
-//				RaycastData[i].mDir = ComputeWorldRay(xi, yi);
-RaycastData[i].mDir = ComputeWorldRay(viewPort, modelMatrix, projMatrix, xi, yi);
+				RaycastData[i].mDir = ComputeWorldRay(xi, yi);
 				Hits[i].mObject = null;
 			}
 
 			udword Time;
+//			_asm	push ebx
 			StartProfile(Time);
+//			_asm	pop ebx
 				pint.BatchRaycasts(pint.mSQHelper->GetThreadContext(), RAYTRACING_RENDER_WIDTH, Hits, RaycastData);
+//			_asm	push ebx
 			EndProfile(Time);
 			TotalTime += Time;
+//			_asm	pop ebx
 
 			for(udword i=0;i<RAYTRACING_RENDER_WIDTH;i++)
 			{
@@ -334,13 +318,6 @@ udword RaytracingTestMT(Picture& pic, Pint& pint, udword& total_time, udword scr
 
 	Point* Dirs = ICE_NEW(Point)[NbPixels];
 	{
-GLint viewPort[4];
-GLdouble modelMatrix[16];
-GLdouble projMatrix[16];
-glGetIntegerv(GL_VIEWPORT, viewPort);
-glGetDoublev(GL_MODELVIEW_MATRIX, modelMatrix);
-glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
-
 		Point* Dest = Dirs;
 		for(udword j=0;j<RAYTRACING_RENDER_HEIGHT;j++)
 		{
@@ -348,8 +325,7 @@ glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
 			for(udword i=0;i<RAYTRACING_RENDER_WIDTH;i++)
 			{
 				const udword xi = udword(fScreenWidth*float(i));
-//				const Point dir = ComputeWorldRay(xi, yi);
-const Point dir = ComputeWorldRay(viewPort, modelMatrix, projMatrix, xi, yi);
+				const Point dir = ComputeWorldRay(xi, yi);
 				*Dest++ = dir;
 			}
 		}

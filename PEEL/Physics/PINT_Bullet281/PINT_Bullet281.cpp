@@ -24,7 +24,7 @@ static			float	gLinearDamping					= 0.1f;
 static			float	gAngularDamping					= 0.05f;
 static			float	gErp							= 0.2f;
 static			float	gErp2							= 0.1f;
-static			float	gCollisionMargin				= 0.04f;
+static			float	gCollisionMargin				= 0.005f;
 static			bool	gUseSplitImpulse				= false;
 static			bool	gRandomizeOrder					= false;
 static			bool	gWarmStarting					= true;
@@ -262,7 +262,6 @@ Bullet::~Bullet()
 void Bullet::GetCaps(PintCaps& caps) const
 {
 	caps.mSupportRigidBodySimulation	= true;
-	caps.mSupportKinematics				= false;
 	caps.mSupportCollisionGroups		= true;
 	caps.mSupportCompounds				= true;
 	caps.mSupportConvexes				= true;
@@ -271,16 +270,11 @@ void Bullet::GetCaps(PintCaps& caps) const
 	caps.mSupportHingeJoints			= true;
 	caps.mSupportFixedJoints			= true;
 	caps.mSupportPrismaticJoints		= true;
-	caps.mSupportPhantoms				= false;
 	caps.mSupportRaycasts				= true;
 	caps.mSupportBoxSweeps				= true;
 	caps.mSupportSphereSweeps			= true;
 	caps.mSupportCapsuleSweeps			= true;
 	caps.mSupportConvexSweeps			= true;
-	caps.mSupportSphereOverlaps			= false;
-	caps.mSupportBoxOverlaps			= false;
-	caps.mSupportCapsuleOverlaps		= false;
-	caps.mSupportConvexOverlaps			= false;
 }
 
 void Bullet::Init(const PINT_WORLD_CREATE& desc)
@@ -375,6 +369,14 @@ void Bullet::Close()
 {
 	//cleanup in the reverse order of creation/initialization
 
+	//delete constraints
+	for(udword j=0;j<mConstraints.size();j++)
+	{
+		btTypedConstraint* c = mConstraints[j];
+		mDynamicsWorld->removeConstraint(c);
+		DELETESINGLE(c);
+	}
+
 	//remove the rigidbodies from the dynamics world and delete them
 	int i;
 	for(i=mDynamicsWorld->getNumCollisionObjects()-1; i>=0 ;i--)
@@ -458,11 +460,6 @@ static void DrawLeafShape(PintRender& renderer, const btCollisionShape* shape, c
 		}
 		else ASSERT(0);
 	}*/
-}
-
-Point Bullet::GetMainColor()
-{
-	return Point(1.0f, 1.0f, 0.4f);
 }
 
 void Bullet::Render(PintRender& renderer)
@@ -676,13 +673,15 @@ btCollisionShape* Bullet::CreateBulletShape(const PINT_SHAPE_CREATE& desc)
 		if(desc.mRenderer)
 			shape->setUserPointer(desc.mRenderer);
 
-		shape->setMargin(gCollisionMargin);
-
 		BulletShape = shape;
 	}
 
 	else ASSERT(0);
 
+	if(BulletShape)
+	{
+		BulletShape->setMargin(gCollisionMargin);
+	}
 	return BulletShape;
 }
 
@@ -950,8 +949,10 @@ PintJointHandle Bullet::CreateJoint(const PINT_JOINT_CREATE& desc)
 	}
 
 	if(constraint)
+	{
 		mDynamicsWorld->addConstraint(constraint, true);
-
+		mConstraints.push_back(constraint);
+	}
 	return constraint;
 }
 

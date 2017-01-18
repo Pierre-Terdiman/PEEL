@@ -676,7 +676,8 @@ void LoadRepXFile_Obsolete(SurfaceManager& test, const char* filename, float sca
 	ASSERT(!test.GetNbSurfaces());
 
 	const char* File = FindPEELFile(filename);
-	if(!File || !LoadRepX_Obsolete(_F("../build/%s", filename), test, scale, z_is_up))
+	if(!File || !LoadRepX_Obsolete(File, test, scale, z_is_up))
+//	if(!File || !LoadRepX_Obsolete(_F("../build/%s", filename), test, scale, z_is_up))
 		printf(_F("Failed to load '%s'\n", filename));
 
 //	if(!LoadRepX_Obsolete(_F("../build/%s", filename), test, scale, z_is_up))

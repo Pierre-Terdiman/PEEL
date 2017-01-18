@@ -99,26 +99,10 @@ Opcode13Pint::~Opcode13Pint()
 
 void Opcode13Pint::GetCaps(PintCaps& caps) const
 {
-	caps.mSupportRigidBodySimulation	= false;
-	caps.mSupportKinematics				= false;
-	caps.mSupportCollisionGroups		= false;
-	caps.mSupportCompounds				= false;
-	caps.mSupportConvexes				= false;
 	caps.mSupportMeshes					= true;
-	caps.mSupportSphericalJoints		= false;
-	caps.mSupportHingeJoints			= false;
-	caps.mSupportFixedJoints			= false;
-	caps.mSupportPrismaticJoints		= false;
-	caps.mSupportPhantoms				= false;
 	caps.mSupportRaycasts				= true;
-	caps.mSupportBoxSweeps				= false;
-	caps.mSupportSphereSweeps			= false;
-	caps.mSupportCapsuleSweeps			= false;
-	caps.mSupportConvexSweeps			= false;
 	caps.mSupportSphereOverlaps			= true;
 	caps.mSupportBoxOverlaps			= true;
-	caps.mSupportCapsuleOverlaps		= false;
-	caps.mSupportConvexOverlaps			= false;
 }
 
 void Opcode13Pint::Init(const PINT_WORLD_CREATE& desc)
@@ -854,28 +838,7 @@ udword Opcode13Pint::FindTriangles_MeshSphereOverlap(PintSQThreadContext context
 	return NbTouchedTriangles;
 }
 
-PR Opcode13Pint::GetWorldTransform(PintObjectHandle handle)
-{
-	return PR();
-}
 
-void Opcode13Pint::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
-{
-}
-
-udword Opcode13Pint::GetShapes(PintObjectHandle* shapes, PintObjectHandle handle)
-{
-	return 0;
-}
-
-void Opcode13Pint::SetLocalRot(PintObjectHandle handle, const Quat& q)
-{
-}
-
-bool Opcode13Pint::GetConvexData(PintObjectHandle handle, PINT_CONVEX_CREATE& data)
-{
-	return false;
-}
 
 
 static Opcode13Pint* gOpcode = null;

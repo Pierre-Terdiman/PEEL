@@ -15,13 +15,14 @@
 #include "Loader_Bin.h"
 #include "Random.h"
 #include "PintSQ.h"
+#include "GUI_Helpers.h"
 
 ///////////////////////////////////////////////////////////////////////////////
 
 static bool SetupSphereOverlaps(TestBase& test, udword nb_x, udword nb_y, float scale_x, float scale_y, float altitude, float sphere_radius)
 {
-	const float OneOverNbX = 1.0f / float(nb_x-1);
-	const float OneOverNbY = 1.0f / float(nb_y-1);
+	const float OneOverNbX = OneOverNb(nb_x);
+	const float OneOverNbY = OneOverNb(nb_y);
 	for(udword y=0;y<nb_y;y++)
 	{
 		const float CoeffY = 2.0f * ((float(y)*OneOverNbY) - 0.5f);
@@ -44,8 +45,8 @@ static bool SetupBoxOverlaps(TestBase& test, udword nb_x, udword nb_y, float sca
 
 	const Point Extents(box_radius, box_radius, box_radius*2.0f);
 
-	const float OneOverNbX = 1.0f / float(nb_x-1);
-	const float OneOverNbY = 1.0f / float(nb_y-1);
+	const float OneOverNbX = OneOverNb(nb_x);
+	const float OneOverNbY = OneOverNb(nb_y);
 	for(udword y=0;y<nb_y;y++)
 	{
 		const float CoeffY = 2.0f * ((float(y)*OneOverNbY) - 0.5f);
@@ -70,8 +71,8 @@ static bool SetupCapsuleOverlaps(TestBase& test, udword nb_x, udword nb_y, float
 {
 	BasicRandom Rnd(42);
 
-	const float OneOverNbX = 1.0f / float(nb_x-1);
-	const float OneOverNbY = 1.0f / float(nb_y-1);
+	const float OneOverNbX = OneOverNb(nb_x);
+	const float OneOverNbY = OneOverNb(nb_y);
 	for(udword y=0;y<nb_y;y++)
 	{
 		const float CoeffY = 2.0f * ((float(y)*OneOverNbY) - 0.5f);
@@ -97,187 +98,208 @@ static bool SetupCapsuleOverlaps(TestBase& test, udword nb_x, udword nb_y, float
 
 ///////////////////////////////////////////////////////////////////////////////
 
-#define IMPLEMENT_OVERLAP_TEST(name, category, desc, query_type,											\
-		altitude, sphere_radius, static_shape, query_shape)													\
-	class name : public TestBase																			\
-	{																										\
-		public:																								\
-								name(PintShape ss, PintShape qs) :											\
-									mStaticShape(ss), mQueryShape(qs)	{						}			\
-		virtual					~name()									{						}			\
-		virtual	const char*		GetName()						const	{ return #name;			}			\
-		virtual	const char*		GetDescription()				const	{ return desc;			}			\
-		virtual	TestCategory	GetCategory()					const	{ return category;		}			\
-		virtual	bool			ProfileUpdate()							{ return true;			}			\
-		virtual bool			CommonSetup()																\
-		{																									\
-			TestBase::CommonSetup();																		\
-			if(mQueryShape==PINT_SHAPE_SPHERE)																\
-				return SetupSphereOverlaps(*this, 32, 32, 200.0f, 200.0f, altitude, sphere_radius);			\
-			else if(mQueryShape==PINT_SHAPE_BOX)															\
-				return SetupBoxOverlaps(*this, 32, 32, 200.0f, 200.0f, altitude, sphere_radius);			\
-			else																							\
-				return false;																				\
-		}																									\
-		virtual bool			Setup(Pint& pint, const PintCaps& caps)										\
-		{																									\
-			if(mQueryShape==PINT_SHAPE_SPHERE && !caps.mSupportSphereOverlaps)								\
-				return false;																				\
-			if(mQueryShape==PINT_SHAPE_BOX && !caps.mSupportBoxOverlaps)									\
-				return false;																				\
-			if(mStaticShape==PINT_SHAPE_SPHERE)																\
-				return CreateSeaOfStaticSpheres(pint, 200.0f, 64, 64, 0.0f);								\
-			if(mStaticShape==PINT_SHAPE_CAPSULE)															\
-				return CreateSeaOfStaticCapsules(pint, 200.0f, 64, 64, 0.0f);								\
-			if(mStaticShape==PINT_SHAPE_BOX)																\
-				return CreateSeaOfStaticBoxes(pint, 200.0f, 64, 64, 0.0f);									\
-			if(mStaticShape==PINT_SHAPE_CONVEX)																\
-				return CreateSeaOfStaticConvexes(pint, caps, 64, 64, 0.0f);									\
-			return false;																					\
-		}																									\
-		virtual udword			Update(Pint& pint)															\
-		{																									\
-			if(mQueryShape==PINT_SHAPE_SPHERE)																\
-				return DoBatchSphereOverlaps(*this, pint, query_type);										\
-			else if(mQueryShape==PINT_SHAPE_BOX)															\
-				return DoBatchBoxOverlaps(*this, pint, query_type);											\
-			return 0;																						\
-		}																									\
-				PintShape		mStaticShape;																\
-				PintShape		mQueryShape;																\
-	}name(static_shape, query_shape);
+static const char* gDesc_OverlapShapesVsShapes = "(Configurable test) - overlaps N*N query shapes vs M*M static shapes. Overlap mode is either 'any' or 'all'. \
+In 'any' mode the overlap query returns a 'boolean' yes/no answer (i.e. whether the shape touches something or not. In 'all' mode the overlap query returns all objects \
+touching the input shape. Obviously, the 'any' mode is faster since the query can early exit as soon as it finds a single hit.";
 
-///////////////////////////////////////////////////////////////////////////////
-
-namespace OverlapAny_Sphere
+class OverlapShapesVsShapes : public TestBase
 {
-	static const char* gDesc_OverlapAny_SmallSpheres_VS_Spheres = "OVERLAP_ANY: 32*32 (small) sphere overlaps against 64*64 static spheres.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_SmallSpheres_VS_Spheres, CATEGORY_OVERLAP, gDesc_OverlapAny_SmallSpheres_VS_Spheres, OVERLAP_ANY, 0.0f, 1.0f, PINT_SHAPE_SPHERE, PINT_SHAPE_SPHERE)
+			IceComboBox*	mComboBox_OverlapQueryType;
+			IceComboBox*	mComboBox_QueryShapeType;
+			IceComboBox*	mComboBox_StaticShapeType;
+			IceEditBox*		mEditBox_QueryShapeSize;
+//			IceEditBox*		mEditBox_StaticShapeSize;
+			IceEditBox*		mEditBox_QueryShapeGridSize;
+			IceEditBox*		mEditBox_StaticShapeGridSize;
+			PintShape		mQueryShapeType;
 
-	static const char* gDesc_OverlapAny_SmallSpheres_VS_Capsules = "OVERLAP_ANY: 32*32 (small) sphere overlaps against 64*64 static capsules.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_SmallSpheres_VS_Capsules, CATEGORY_OVERLAP, gDesc_OverlapAny_SmallSpheres_VS_Capsules, OVERLAP_ANY, 0.0f, 1.0f, PINT_SHAPE_CAPSULE, PINT_SHAPE_SPHERE)
+	public:
+							OverlapShapesVsShapes() :
+								mComboBox_OverlapQueryType	(null),
+								mComboBox_QueryShapeType	(null),
+								mComboBox_StaticShapeType	(null),
+								mEditBox_QueryShapeSize		(null),
+//								mEditBox_StaticShapeSize	(null),
+								mEditBox_QueryShapeGridSize	(null),
+								mEditBox_StaticShapeGridSize(null),
+								mQueryShapeType				(PINT_SHAPE_UNDEFINED)
+								{}
+	virtual					~OverlapShapesVsShapes()	{										}
+	virtual	const char*		GetName()			const	{ return "OverlapShapesVsShapes";		}
+	virtual	const char*		GetDescription()	const	{ return gDesc_OverlapShapesVsShapes;	}
+	virtual	TestCategory	GetCategory()		const	{ return CATEGORY_OVERLAP;				}
+	virtual	bool			ProfileUpdate()				{ return true;							}
 
-	static const char* gDesc_OverlapAny_SmallSpheres_VS_Boxes = "OVERLAP_ANY: 32*32 (small) sphere overlaps against 64*64 static boxes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_SmallSpheres_VS_Boxes, CATEGORY_OVERLAP, gDesc_OverlapAny_SmallSpheres_VS_Boxes, OVERLAP_ANY, 0.0f, 1.0f, PINT_SHAPE_BOX, PINT_SHAPE_SPHERE)
+	virtual	void			InitUI(PintGUIHelper& helper)
+	{
+		WindowDesc WD;
+		WD.mParent	= null;
+		WD.mX		= 50;
+		WD.mY		= 50;
+		WD.mWidth	= 300;
+		WD.mHeight	= 240;
+		WD.mLabel	= "OverlapShapesVsShapes";
+		WD.mType	= WINDOW_DIALOG;
+		IceWindow* UI = ICE_NEW(IceWindow)(WD);
+		RegisterUIElement(UI);
+		UI->SetVisible(true);
 
-	static const char* gDesc_OverlapAny_SmallSpheres_VS_Convexes = "OVERLAP_ANY: 32*32 (small) sphere overlaps against 64*64 static convexes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_SmallSpheres_VS_Convexes, CATEGORY_OVERLAP, gDesc_OverlapAny_SmallSpheres_VS_Convexes, OVERLAP_ANY, 0.0f, 2.0f, PINT_SHAPE_CONVEX, PINT_SHAPE_SPHERE)
+		Container* UIElems = GetUIElements();
 
-	///////////////////////////////////////////////////////////////////////////////
+		const sdword EditBoxWidth = 60;
+		const sdword LabelWidth = 110;
+		const sdword OffsetX = LabelWidth + 10;
+		const sdword LabelOffsetY = 2;
+		const sdword YStep = 20;
+		sdword y = 0;
+		{
+			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "Overlap query type:", UIElems);
+			{
+				ComboBoxDesc CBBD;
+				CBBD.mID		= 0;
+				CBBD.mParent	= UI;
+				CBBD.mX			= 4+OffsetX;
+				CBBD.mY			= y;
+				CBBD.mWidth		= 170;
+				CBBD.mHeight	= 20;
+				CBBD.mLabel		= "Overlap query type";
+				IceComboBox* CB = ICE_NEW(IceComboBox)(CBBD);
+				CB->Add("Overlap any (returns 1st hit)");
+				CB->Add("Overlap multiple (returns all hits)");
+				CB->Select(0);
+				CB->SetVisible(true);
+				mComboBox_OverlapQueryType = CB;
+			}
+			RegisterUIElement(mComboBox_OverlapQueryType);
+			y += YStep;
+			y += YStep;
 
-	static const char* gDesc_OverlapAny_LargeSpheres_VS_Spheres = "OVERLAP_ANY: 32*32 (large) sphere overlaps against 64*64 static spheres.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_LargeSpheres_VS_Spheres, CATEGORY_OVERLAP, gDesc_OverlapAny_LargeSpheres_VS_Spheres, OVERLAP_ANY, 0.0f, 20.0f, PINT_SHAPE_SPHERE, PINT_SHAPE_SPHERE)
+			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "Query shape grid size:", UIElems);
+			mEditBox_QueryShapeGridSize = helper.CreateEditBox(UI, 1, 4+OffsetX, y, EditBoxWidth, 20, "32", UIElems, EDITBOX_INTEGER_POSITIVE, null, null);
+			mEditBox_QueryShapeGridSize->SetEnabled(true);
+			y += YStep;
 
-	static const char* gDesc_OverlapAny_LargeSpheres_VS_Capsules = "OVERLAP_ANY: 32*32 (large) sphere overlaps against 64*64 static capsules.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_LargeSpheres_VS_Capsules, CATEGORY_OVERLAP, gDesc_OverlapAny_LargeSpheres_VS_Capsules, OVERLAP_ANY, 0.0f, 20.0f, PINT_SHAPE_CAPSULE, PINT_SHAPE_SPHERE)
+			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "Query shape size:", UIElems);
+			mEditBox_QueryShapeSize = helper.CreateEditBox(UI, 1, 4+OffsetX, y, EditBoxWidth, 20, "1.0", UIElems, EDITBOX_FLOAT_POSITIVE, null, null);
+			mEditBox_QueryShapeSize->SetEnabled(true);
+			y += YStep;
 
-	static const char* gDesc_OverlapAny_LargeSpheres_VS_Boxes = "OVERLAP_ANY: 32*32 (large) sphere overlaps against 64*64 static boxes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_LargeSpheres_VS_Boxes, CATEGORY_OVERLAP, gDesc_OverlapAny_LargeSpheres_VS_Boxes, OVERLAP_ANY, 0.0f, 20.0f, PINT_SHAPE_BOX, PINT_SHAPE_SPHERE)
+			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "Query shape type:", UIElems);
+			mComboBox_QueryShapeType = CreateShapeTypeComboBox(UI, 4+OffsetX, y, true, SSM_UNDEFINED|SSM_SPHERE|SSM_BOX);
+			RegisterUIElement(mComboBox_QueryShapeType);
+			mComboBox_QueryShapeType->Select(1);
+			y += YStep;
+			y += YStep;
 
-	static const char* gDesc_OverlapAny_LargeSpheres_VS_Convexes = "OVERLAP_ANY: 32*32 (large) sphere overlaps against 64*64 static convexes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_LargeSpheres_VS_Convexes, CATEGORY_OVERLAP, gDesc_OverlapAny_LargeSpheres_VS_Convexes, OVERLAP_ANY, 0.0f, 20.0f, PINT_SHAPE_CONVEX, PINT_SHAPE_SPHERE)
-}
+			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "Static shape grid size:", UIElems);
+			mEditBox_StaticShapeGridSize = helper.CreateEditBox(UI, 1, 4+OffsetX, y, EditBoxWidth, 20, "64", UIElems, EDITBOX_INTEGER_POSITIVE, null, null);
+			mEditBox_StaticShapeGridSize->SetEnabled(true);
+			y += YStep;
+
+/*			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "Static shape size:", UIElems);
+			mEditBox_StaticShapeSize = helper.CreateEditBox(UI, 1, 4+OffsetX, y, EditBoxWidth, 20, "1.0", UIElems, EDITBOX_FLOAT_POSITIVE, null, null);
+			mEditBox_StaticShapeSize->SetEnabled(true);
+			y += YStep;*/
+
+			helper.CreateLabel(UI, 4, y+LabelOffsetY, LabelWidth, 20, "Static shape type:", UIElems);
+			mComboBox_StaticShapeType = CreateShapeTypeComboBox(UI, 4+OffsetX, y, true, SSM_UNDEFINED|SSM_SPHERE|SSM_CAPSULE|SSM_BOX|SSM_CONVEX);
+			RegisterUIElement(mComboBox_StaticShapeType);
+			mComboBox_StaticShapeType->Select(1);
+			y += YStep;
+		}
+
+		y += YStep;
+		AddResetButton(UI, 4, y, 300-16);
+	}
+
+	virtual void			GetSceneParams(PINT_WORLD_CREATE& desc)
+	{
+		TestBase::GetSceneParams(desc);
+		desc.mCamera[0] = CameraPose(Point(251.56f, 290.07f, 258.05f), Point(-0.49f, -0.73f, -0.47f));
+		desc.mCamera[1] = CameraPose(Point(121.41f, 39.53f, 123.18f), Point(-0.66f, -0.46f, -0.60f));
+	}
+
+	virtual bool			CommonSetup()
+	{
+		TestBase::CommonSetup();
+
+		const udword GridSize = GetFromEditBox(32, mEditBox_QueryShapeGridSize);
+		const float ShapeSize = GetFromEditBox(1.0f, mEditBox_QueryShapeSize, 0.0f, MAX_FLOAT);
+		const float Altitude = 0.0f;
+
+		mQueryShapeType = PINT_SHAPE_UNDEFINED;
+		if(mComboBox_QueryShapeType)
+			mQueryShapeType = PintShape(mComboBox_QueryShapeType->GetSelectedIndex());
+
+		if(mQueryShapeType==PINT_SHAPE_SPHERE)
+			return SetupSphereOverlaps(*this, GridSize, GridSize, 200.0f, 200.0f, Altitude, ShapeSize);
+		else if(mQueryShapeType==PINT_SHAPE_BOX)
+			return SetupBoxOverlaps(*this, GridSize, GridSize, 200.0f, 200.0f, Altitude, ShapeSize);
+		else
+			return false;
+	}
+
+	virtual bool			Setup(Pint& pint, const PintCaps& caps)
+	{
+		if(mQueryShapeType==PINT_SHAPE_SPHERE && !caps.mSupportSphereOverlaps)
+			return false;
+		if(mQueryShapeType==PINT_SHAPE_BOX && !caps.mSupportBoxOverlaps)
+			return false;
+		if(mQueryShapeType==PINT_SHAPE_CAPSULE && !caps.mSupportCapsuleOverlaps)
+			return false;
+		if(mQueryShapeType==PINT_SHAPE_CONVEX && !caps.mSupportConvexOverlaps)
+			return false;
+
+		// We only support these ones for now
+		if(mQueryShapeType!=PINT_SHAPE_UNDEFINED && mQueryShapeType!=PINT_SHAPE_SPHERE && mQueryShapeType!=PINT_SHAPE_BOX)
+			return false;
+
+		PintShape StaticShapeType = PINT_SHAPE_UNDEFINED;
+		if(mComboBox_StaticShapeType)
+			StaticShapeType = PintShape(mComboBox_StaticShapeType->GetSelectedIndex());
+		if(StaticShapeType==PINT_SHAPE_UNDEFINED)
+			return true;
+
+		const udword GridSize = GetFromEditBox(32, mEditBox_StaticShapeGridSize);
+//		const float ShapeSize = GetFromEditBox(1.0f, mEditBox_StaticShapeSize, 0.0f, MAX_FLOAT);
+		const float Altitude = 0.0f;
+		const float Amplitude = 200.0f;
+
+		if(StaticShapeType==PINT_SHAPE_SPHERE)
+			return CreateSeaOfStaticSpheres(pint, Amplitude, GridSize, GridSize, Altitude);
+		if(StaticShapeType==PINT_SHAPE_CAPSULE)
+			return CreateSeaOfStaticCapsules(pint, Amplitude, GridSize, GridSize, Altitude);
+		if(StaticShapeType==PINT_SHAPE_BOX)
+			return CreateSeaOfStaticBoxes(pint, Amplitude, GridSize, GridSize, Altitude);
+		if(StaticShapeType==PINT_SHAPE_CONVEX)
+			return CreateSeaOfStaticConvexes(pint, caps, GridSize, GridSize, Altitude);
+
+		return false;
+	}
+
+	virtual udword			Update(Pint& pint, float dt)
+	{
+		BatchOverlapMode OverlapQueryType = OVERLAP_ANY;
+		if(mComboBox_OverlapQueryType && mComboBox_OverlapQueryType->GetSelectedIndex()==1)
+			OverlapQueryType = OVERLAP_OBJECTS;
+
+		if(mQueryShapeType==PINT_SHAPE_SPHERE)
+			return DoBatchSphereOverlaps(*this, pint, OverlapQueryType);
+		else if(mQueryShapeType==PINT_SHAPE_BOX)
+			return DoBatchBoxOverlaps(*this, pint, OverlapQueryType);
+		return 0;
+	}
+
+}OverlapShapesVsShapes;
 
 ///////////////////////////////////////////////////////////////////////////////
 
-namespace OverlapObjects_Sphere
-{
-	static const char* gDesc_OverlapObjects_SmallSpheres_VS_Spheres = "OVERLAP_OBJECTS: 32*32 (small) sphere overlaps against 64*64 static spheres.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_SmallSpheres_VS_Spheres, CATEGORY_OVERLAP, gDesc_OverlapObjects_SmallSpheres_VS_Spheres, OVERLAP_OBJECTS, 0.0f, 1.0f, PINT_SHAPE_SPHERE, PINT_SHAPE_SPHERE)
-
-	static const char* gDesc_OverlapObjects_SmallSpheres_VS_Capsules = "OVERLAP_OBJECTS: 32*32 (small) sphere overlaps against 64*64 static capsules.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_SmallSpheres_VS_Capsules, CATEGORY_OVERLAP, gDesc_OverlapObjects_SmallSpheres_VS_Capsules, OVERLAP_OBJECTS, 0.0f, 1.0f, PINT_SHAPE_CAPSULE, PINT_SHAPE_SPHERE)
-
-	static const char* gDesc_OverlapObjects_SmallSpheres_VS_Boxes = "OVERLAP_OBJECTS: 32*32 (small) sphere overlaps against 64*64 static boxes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_SmallSpheres_VS_Boxes, CATEGORY_OVERLAP, gDesc_OverlapObjects_SmallSpheres_VS_Boxes, OVERLAP_OBJECTS, 0.0f, 1.0f, PINT_SHAPE_BOX, PINT_SHAPE_SPHERE)
-
-	static const char* gDesc_OverlapObjects_SmallSpheres_VS_Convexes = "OVERLAP_OBJECTS: 32*32 (small) sphere overlaps against 64*64 static convexes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_SmallSpheres_VS_Convexes, CATEGORY_OVERLAP, gDesc_OverlapObjects_SmallSpheres_VS_Convexes, OVERLAP_OBJECTS, 0.0f, 2.0f, PINT_SHAPE_CONVEX, PINT_SHAPE_SPHERE)
-
-	///////////////////////////////////////////////////////////////////////////////
-
-	static const char* gDesc_OverlapObjects_LargeSpheres_VS_Spheres = "OVERLAP_OBJECTS: 32*32 (large) sphere overlaps against 64*64 static spheres.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_LargeSpheres_VS_Spheres, CATEGORY_OVERLAP, gDesc_OverlapObjects_LargeSpheres_VS_Spheres, OVERLAP_OBJECTS, 0.0f, 20.0f, PINT_SHAPE_SPHERE, PINT_SHAPE_SPHERE)
-
-	static const char* gDesc_OverlapObjects_LargeSpheres_VS_Capsules = "OVERLAP_OBJECTS: 32*32 (large) sphere overlaps against 64*64 static capsules.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_LargeSpheres_VS_Capsules, CATEGORY_OVERLAP, gDesc_OverlapObjects_LargeSpheres_VS_Capsules, OVERLAP_OBJECTS, 0.0f, 20.0f, PINT_SHAPE_CAPSULE, PINT_SHAPE_SPHERE)
-
-	static const char* gDesc_OverlapObjects_LargeSpheres_VS_Boxes = "OVERLAP_OBJECTS: 32*32 (large) sphere overlaps against 64*64 static boxes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_LargeSpheres_VS_Boxes, CATEGORY_OVERLAP, gDesc_OverlapObjects_LargeSpheres_VS_Boxes, OVERLAP_OBJECTS, 0.0f, 20.0f, PINT_SHAPE_BOX, PINT_SHAPE_SPHERE)
-
-	static const char* gDesc_OverlapObjects_LargeSpheres_VS_Convexes = "OVERLAP_OBJECTS: 32*32 (large) sphere overlaps against 64*64 static convexes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_LargeSpheres_VS_Convexes, CATEGORY_OVERLAP, gDesc_OverlapObjects_LargeSpheres_VS_Convexes, OVERLAP_OBJECTS, 0.0f, 20.0f, PINT_SHAPE_CONVEX, PINT_SHAPE_SPHERE)
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-namespace OverlapAny_Box
-{
-	static const char* gDesc_OverlapAny_SmallBoxes_VS_Spheres = "OVERLAP_ANY: 32*32 (small) box overlaps against 64*64 static spheres.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_SmallBoxes_VS_Spheres, CATEGORY_OVERLAP, gDesc_OverlapAny_SmallBoxes_VS_Spheres, OVERLAP_ANY, 0.0f, 1.0f, PINT_SHAPE_SPHERE, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapAny_SmallBoxes_VS_Capsules = "OVERLAP_ANY: 32*32 (small) box overlaps against 64*64 static capsules.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_SmallBoxes_VS_Capsules, CATEGORY_OVERLAP, gDesc_OverlapAny_SmallBoxes_VS_Capsules, OVERLAP_ANY, 0.0f, 1.0f, PINT_SHAPE_CAPSULE, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapAny_SmallBoxes_VS_Boxes = "OVERLAP_ANY: 32*32 (small) box overlaps against 64*64 static boxes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_SmallBoxes_VS_Boxes, CATEGORY_OVERLAP, gDesc_OverlapAny_SmallBoxes_VS_Boxes, OVERLAP_ANY, 0.0f, 1.0f, PINT_SHAPE_BOX, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapAny_SmallBoxes_VS_Convexes = "OVERLAP_ANY: 32*32 (small) box overlaps against 64*64 static convexes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_SmallBoxes_VS_Convexes, CATEGORY_OVERLAP, gDesc_OverlapAny_SmallBoxes_VS_Convexes, OVERLAP_ANY, 0.0f, 2.0f, PINT_SHAPE_CONVEX, PINT_SHAPE_BOX)
-
-	///////////////////////////////////////////////////////////////////////////////
-
-	static const char* gDesc_OverlapAny_LargeBoxes_VS_Spheres = "OVERLAP_ANY: 32*32 (large) box overlaps against 64*64 static spheres.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_LargeBoxes_VS_Spheres, CATEGORY_OVERLAP, gDesc_OverlapAny_LargeBoxes_VS_Spheres, OVERLAP_ANY, 0.0f, 10.0f, PINT_SHAPE_SPHERE, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapAny_LargeBoxes_VS_Capsules = "OVERLAP_ANY: 32*32 (large) box overlaps against 64*64 static capsules.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_LargeBoxes_VS_Capsules, CATEGORY_OVERLAP, gDesc_OverlapAny_LargeBoxes_VS_Capsules, OVERLAP_ANY, 0.0f, 10.0f, PINT_SHAPE_CAPSULE, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapAny_LargeBoxes_VS_Boxes = "OVERLAP_ANY: 32*32 (large) box overlaps against 64*64 static boxes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_LargeBoxes_VS_Boxes, CATEGORY_OVERLAP, gDesc_OverlapAny_LargeBoxes_VS_Boxes, OVERLAP_ANY, 0.0f, 10.0f, PINT_SHAPE_BOX, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapAny_LargeBoxes_VS_Convexes = "OVERLAP_ANY: 32*32 (large) box overlaps against 64*64 static convexes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapAny_LargeBoxes_VS_Convexes, CATEGORY_OVERLAP, gDesc_OverlapAny_LargeBoxes_VS_Convexes, OVERLAP_ANY, 0.0f, 20.0f, PINT_SHAPE_CONVEX, PINT_SHAPE_BOX)
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-namespace OverlapObjects_Box
-{
-	static const char* gDesc_OverlapObjects_SmallBoxes_VS_Spheres = "OVERLAP_OBJECTS: 32*32 (small) box overlaps against 64*64 static spheres.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_SmallBoxes_VS_Spheres, CATEGORY_OVERLAP, gDesc_OverlapObjects_SmallBoxes_VS_Spheres, OVERLAP_OBJECTS, 0.0f, 1.0f, PINT_SHAPE_SPHERE, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapObjects_SmallBoxes_VS_Capsules = "OVERLAP_OBJECTS: 32*32 (small) box overlaps against 64*64 static capsules.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_SmallBoxes_VS_Capsules, CATEGORY_OVERLAP, gDesc_OverlapObjects_SmallBoxes_VS_Capsules, OVERLAP_OBJECTS, 0.0f, 1.0f, PINT_SHAPE_CAPSULE, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapObjects_SmallBoxes_VS_Boxes = "OVERLAP_OBJECTS: 32*32 (small) box overlaps against 64*64 static boxes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_SmallBoxes_VS_Boxes, CATEGORY_OVERLAP, gDesc_OverlapObjects_SmallBoxes_VS_Boxes, OVERLAP_OBJECTS, 0.0f, 1.0f, PINT_SHAPE_BOX, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapObjects_SmallBoxes_VS_Convexes = "OVERLAP_OBJECTS: 32*32 (small) box overlaps against 64*64 static convexes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_SmallBoxes_VS_Convexes, CATEGORY_OVERLAP, gDesc_OverlapObjects_SmallBoxes_VS_Convexes, OVERLAP_OBJECTS, 0.0f, 2.0f, PINT_SHAPE_CONVEX, PINT_SHAPE_BOX)
-
-	///////////////////////////////////////////////////////////////////////////////
-
-	static const char* gDesc_OverlapObjects_LargeBoxes_VS_Spheres = "OVERLAP_OBJECTS: 32*32 (large) box overlaps against 64*64 static spheres.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_LargeBoxes_VS_Spheres, CATEGORY_OVERLAP, gDesc_OverlapObjects_LargeBoxes_VS_Spheres, OVERLAP_OBJECTS, 0.0f, 10.0f, PINT_SHAPE_SPHERE, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapObjects_LargeBoxes_VS_Capsules = "OVERLAP_OBJECTS: 32*32 (large) box overlaps against 64*64 static capsules.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_LargeBoxes_VS_Capsules, CATEGORY_OVERLAP, gDesc_OverlapObjects_LargeBoxes_VS_Capsules, OVERLAP_OBJECTS, 0.0f, 10.0f, PINT_SHAPE_CAPSULE, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapObjects_LargeBoxes_VS_Boxes = "OVERLAP_OBJECTS: 32*32 (large) box overlaps against 64*64 static boxes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_LargeBoxes_VS_Boxes, CATEGORY_OVERLAP, gDesc_OverlapObjects_LargeBoxes_VS_Boxes, OVERLAP_OBJECTS, 0.0f, 10.0f, PINT_SHAPE_BOX, PINT_SHAPE_BOX)
-
-	static const char* gDesc_OverlapObjects_LargeBoxes_VS_Convexes = "OVERLAP_OBJECTS: 32*32 (large) box overlaps against 64*64 static convexes.";
-	IMPLEMENT_OVERLAP_TEST(OverlapObjects_LargeBoxes_VS_Convexes, CATEGORY_OVERLAP, gDesc_OverlapObjects_LargeBoxes_VS_Convexes, OVERLAP_OBJECTS, 0.0f, 20.0f, PINT_SHAPE_CONVEX, PINT_SHAPE_BOX)
-}
-
-///////////////////////////////////////////////////////////////////////////////
-
-static const char* gDesc_OverlapObjects_DynamicSphere = "OVERLAP_OBJECTS: single dynamic sphere overlap against 128*128 static boxes.";
+static const char* gDesc_OverlapObjects_DynamicSphere = "OVERLAP_OBJECTS: single dynamic sphere overlap against 128*128 static boxes. \
+The goal is to report all boxes touched by the sphere.";
 
 START_SQ_TEST(OverlapObjects_DynamicSphere, CATEGORY_OVERLAP, gDesc_OverlapObjects_DynamicSphere)
 
-	virtual bool OverlapObjects_DynamicSphere::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		RegisterSphereOverlap(Sphere(Point(0.0f, 0.0f, 0.0f), 1.0f));
@@ -285,7 +307,7 @@ START_SQ_TEST(OverlapObjects_DynamicSphere, CATEGORY_OVERLAP, gDesc_OverlapObjec
 		return true;
 	}
 
-	virtual bool OverlapObjects_DynamicSphere::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps)
 			return false;
@@ -293,15 +315,14 @@ START_SQ_TEST(OverlapObjects_DynamicSphere, CATEGORY_OVERLAP, gDesc_OverlapObjec
 		return CreateSeaOfStaticBoxes(pint, 200.0f, 128, 128, 0.0f);
 	}
 
-	virtual void OverlapObjects_DynamicSphere::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
-		mCurrentTime += 1.0f/60.0f;
-		TestBase::CommonUpdate();
+		TestBase::CommonUpdate(dt);
 		PintSphereOverlapData* Data = GetRegisteredSphereOverlaps();
 		Data->mSphere.mRadius = (2.0f+sinf(mCurrentTime*1.0f))*10.0f;
 	}
 
-	virtual udword OverlapObjects_DynamicSphere::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchSphereOverlaps(*this, pint, OVERLAP_OBJECTS);
 	}
@@ -310,17 +331,18 @@ END_TEST(OverlapObjects_DynamicSphere)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_OverlapObjects_DynamicSpheres = "OVERLAP_OBJECTS: 32*32 (dynamic) spheres against 128*128 static boxes.";
+static const char* gDesc_OverlapObjects_DynamicSpheres = "OVERLAP_OBJECTS: 32*32 (dynamic) spheres against 128*128 static boxes. \
+The goal is to report all boxes touched by the spheres.";
 
 START_SQ_TEST(OverlapObjects_DynamicSpheres, CATEGORY_OVERLAP, gDesc_OverlapObjects_DynamicSpheres)
 
-	virtual bool OverlapObjects_DynamicSpheres::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		return SetupSphereOverlaps(*this, 32, 32, 200.0f, 200.0f, 0.0f, 20.0f);
 	}
 
-	virtual bool OverlapObjects_DynamicSpheres::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps)
 			return false;
@@ -328,10 +350,9 @@ START_SQ_TEST(OverlapObjects_DynamicSpheres, CATEGORY_OVERLAP, gDesc_OverlapObje
 		return CreateSeaOfStaticBoxes(pint, 200.0f, 128, 128, 0.0f);
 	}
 
-	virtual void OverlapObjects_DynamicSpheres::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
-		mCurrentTime += 1.0f/60.0f;
-		TestBase::CommonUpdate();
+		TestBase::CommonUpdate(dt);
 		udword Nb = GetNbRegisteredSphereOverlaps();
 		PintSphereOverlapData* Data = GetRegisteredSphereOverlaps();
 		const float Radius = (2.0f+sinf(mCurrentTime*1.0f))*5.0f;
@@ -342,7 +363,7 @@ START_SQ_TEST(OverlapObjects_DynamicSpheres, CATEGORY_OVERLAP, gDesc_OverlapObje
 		}
 	}
 
-	virtual udword OverlapObjects_DynamicSpheres::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchSphereOverlaps(*this, pint, OVERLAP_OBJECTS);
 	}
@@ -351,11 +372,11 @@ END_TEST(OverlapObjects_DynamicSpheres)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_OverlapAny_SphereVsTessBunny = "OVERLAP_ANY: 1 sphere against the tesselated bunny. This is really just to investigate an issue in PhysX.";
+static const char* gDesc_OverlapAny_SphereVsTessBunny = "OVERLAP_ANY: 1 sphere against the tessellated bunny. This is really just to investigate an issue in PhysX.";
 
 START_SQ_TEST(OverlapAny_SphereVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_SphereVsTessBunny)
 
-	virtual bool OverlapAny_SphereVsTessBunny::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadMeshesFromFile_(*this, "bunny.bin", null, false, 3);
@@ -364,7 +385,7 @@ START_SQ_TEST(OverlapAny_SphereVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_S
 		return true;
 	}
 
-	virtual bool OverlapAny_SphereVsTessBunny::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps)
 			return false;
@@ -372,7 +393,7 @@ START_SQ_TEST(OverlapAny_SphereVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_S
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword OverlapAny_SphereVsTessBunny::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchSphereOverlaps(*this, pint, OVERLAP_ANY);
 	}
@@ -381,11 +402,11 @@ END_TEST(OverlapAny_SphereVsTessBunny)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_OverlapObjects_SphereVsTessBunny = "OVERLAP_OBJECTS: 1 sphere against the tesselated bunny. This is really just to investigate an issue in Havok.";
+static const char* gDesc_OverlapObjects_SphereVsTessBunny = "OVERLAP_OBJECTS: 1 sphere against the tessellated bunny. This is really just to investigate an issue in Havok.";
 
 START_SQ_TEST(OverlapObjects_SphereVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapObjects_SphereVsTessBunny)
 
-	virtual bool OverlapObjects_SphereVsTessBunny::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadMeshesFromFile_(*this, "bunny.bin", null, false, 3);
@@ -394,7 +415,7 @@ START_SQ_TEST(OverlapObjects_SphereVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapO
 		return true;
 	}
 
-	virtual bool OverlapObjects_SphereVsTessBunny::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps)
 			return false;
@@ -402,7 +423,7 @@ START_SQ_TEST(OverlapObjects_SphereVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapO
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword OverlapObjects_SphereVsTessBunny::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchSphereOverlaps(*this, pint, OVERLAP_OBJECTS);
 	}
@@ -411,11 +432,12 @@ END_TEST(OverlapObjects_SphereVsTessBunny)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_OverlapAny_SpheresVsTessBunny = "OVERLAP_ANY: 16*16*16 spheres against the tesselated bunny";
+static const char* gDesc_OverlapAny_SpheresVsTessBunny = "OVERLAP_ANY: 16*16*16 spheres against the tessellated bunny. \
+This reports how many spheres touched the mesh.";
 
 START_SQ_TEST(OverlapAny_SpheresVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_SpheresVsTessBunny)
 
-	virtual bool OverlapAny_SpheresVsTessBunny::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadMeshesFromFile_(*this, "bunny.bin", null, false, 3);
@@ -424,7 +446,7 @@ START_SQ_TEST(OverlapAny_SpheresVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_
 		return true;
 	}
 
-	virtual bool OverlapAny_SpheresVsTessBunny::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps)
 			return false;
@@ -432,10 +454,9 @@ START_SQ_TEST(OverlapAny_SpheresVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual void OverlapAny_SpheresVsTessBunny::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
-		mCurrentTime += 1.0f/60.0f;
-		TestBase::CommonUpdate();
+		TestBase::CommonUpdate(dt);
 		udword Nb = GetNbRegisteredSphereOverlaps();
 		PintSphereOverlapData* Data = GetRegisteredSphereOverlaps();
 		const float Radius = 0.1f+(1.0f + sinf(mCurrentTime*1.0f))*1.0f;
@@ -446,7 +467,7 @@ START_SQ_TEST(OverlapAny_SpheresVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_
 		}
 	}
 
-	virtual udword OverlapAny_SpheresVsTessBunny::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchSphereOverlaps(*this, pint, OVERLAP_ANY);
 	}
@@ -455,11 +476,12 @@ END_TEST(OverlapAny_SpheresVsTessBunny)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_OverlapAny_BoxesVsTessBunny = "OVERLAP_ANY: 16*16*16 boxes against the tesselated bunny";
+static const char* gDesc_OverlapAny_BoxesVsTessBunny = "OVERLAP_ANY: 16*16*16 boxes against the tessellated bunny. \
+This reports how many boxes touched the mesh.";
 
 START_SQ_TEST(OverlapAny_BoxesVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_BoxesVsTessBunny)
 
-	virtual bool OverlapAny_BoxesVsTessBunny::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadMeshesFromFile_(*this, "bunny.bin", null, false, 3);
@@ -468,7 +490,7 @@ START_SQ_TEST(OverlapAny_BoxesVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_Bo
 		return true;
 	}
 
-	virtual bool OverlapAny_BoxesVsTessBunny::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportBoxOverlaps)
 			return false;
@@ -476,7 +498,7 @@ START_SQ_TEST(OverlapAny_BoxesVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_Bo
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword OverlapAny_BoxesVsTessBunny::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchBoxOverlaps(*this, pint, OVERLAP_ANY);
 	}
@@ -485,11 +507,12 @@ END_TEST(OverlapAny_BoxesVsTessBunny)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-static const char* gDesc_OverlapAny_CapsulesVsTessBunny = "OVERLAP_ANY: 16*16*16 capsules against the tesselated bunny";
+static const char* gDesc_OverlapAny_CapsulesVsTessBunny = "OVERLAP_ANY: 16*16*16 capsules against the tessellated bunny. \
+This reports how many capsules touched the mesh.";
 
 START_SQ_TEST(OverlapAny_CapsulesVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny_CapsulesVsTessBunny)
 
-	virtual bool OverlapAny_CapsulesVsTessBunny::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadMeshesFromFile_(*this, "bunny.bin", null, false, 3);
@@ -498,7 +521,7 @@ START_SQ_TEST(OverlapAny_CapsulesVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny
 		return true;
 	}
 
-	virtual bool OverlapAny_CapsulesVsTessBunny::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportCapsuleOverlaps)
 			return false;
@@ -506,7 +529,7 @@ START_SQ_TEST(OverlapAny_CapsulesVsTessBunny, CATEGORY_OVERLAP, gDesc_OverlapAny
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword OverlapAny_CapsulesVsTessBunny::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchCapsuleOverlaps(*this, pint, OVERLAP_ANY);
 	}
@@ -519,13 +542,13 @@ static const char* gDesc_OverlapAny_SpheresVsTerrain = "OVERLAP_ANY: 4096 sphere
 
 START_SQ_TEST(OverlapAny_SpheresVsTerrain, CATEGORY_OVERLAP, gDesc_OverlapAny_SpheresVsTerrain)
 
-	virtual void OverlapAny_SpheresVsTerrain::GetSceneParams(PINT_WORLD_CREATE& desc)
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
 	{
 		TestBase::GetSceneParams(desc);
 		desc.mCamera[0] = CameraPose(Point(-480.68f, 1639.54f, -443.50f), Point(0.59f, -0.60f, 0.54f));
 	}
 
-	virtual bool OverlapAny_SpheresVsTerrain::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadMeshesFromFile_(*this, "terrain.bin");
@@ -548,7 +571,7 @@ START_SQ_TEST(OverlapAny_SpheresVsTerrain, CATEGORY_OVERLAP, gDesc_OverlapAny_Sp
 		return true;
 	}
 
-	virtual bool OverlapAny_SpheresVsTerrain::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps)
 			return false;
@@ -556,7 +579,7 @@ START_SQ_TEST(OverlapAny_SpheresVsTerrain, CATEGORY_OVERLAP, gDesc_OverlapAny_Sp
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword OverlapAny_SpheresVsTerrain::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchSphereOverlaps(*this, pint, OVERLAP_ANY);
 	}
@@ -569,13 +592,13 @@ static const char* gDesc_OverlapAny_BoxesVsTerrain = "OVERLAP_ANY: 4096 boxes ag
 
 START_SQ_TEST(OverlapAny_BoxesVsTerrain, CATEGORY_OVERLAP, gDesc_OverlapAny_BoxesVsTerrain)
 
-	virtual void OverlapAny_BoxesVsTerrain::GetSceneParams(PINT_WORLD_CREATE& desc)
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
 	{
 		TestBase::GetSceneParams(desc);
 		desc.mCamera[0] = CameraPose(Point(-480.68f, 1639.54f, -443.50f), Point(0.59f, -0.60f, 0.54f));
 	}
 
-	virtual bool OverlapAny_BoxesVsTerrain::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadMeshesFromFile_(*this, "terrain.bin");
@@ -600,7 +623,7 @@ START_SQ_TEST(OverlapAny_BoxesVsTerrain, CATEGORY_OVERLAP, gDesc_OverlapAny_Boxe
 		return true;
 	}
 
-	virtual bool OverlapAny_BoxesVsTerrain::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportBoxOverlaps)
 			return false;
@@ -608,7 +631,7 @@ START_SQ_TEST(OverlapAny_BoxesVsTerrain, CATEGORY_OVERLAP, gDesc_OverlapAny_Boxe
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword OverlapAny_BoxesVsTerrain::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 //		return DoBatchBoxOverlaps(*this, pint, OVERLAP_OBJECTS);
 		return DoBatchBoxOverlaps(*this, pint, OVERLAP_ANY);
@@ -622,18 +645,18 @@ static const char* gDesc_OverlapAny_SpheresVsPlanetSide = "OVERLAP_ANY: 4096 sph
 
 START_SQ_TEST(OverlapAny_SpheresVsPlanetSide, CATEGORY_OVERLAP, gDesc_OverlapAny_SpheresVsPlanetSide)
 
-	virtual bool OverlapAny_SpheresVsPlanetSide::IsPrivate()	const
+	virtual bool	IsPrivate()	const
 	{
 		return true;
 	}
 
-	virtual void OverlapAny_SpheresVsPlanetSide::GetSceneParams(PINT_WORLD_CREATE& desc)
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
 	{
 		TestBase::GetSceneParams(desc);
 		desc.mCamera[0] = CameraPose(Point(-480.68f, 1639.54f, -443.50f), Point(0.59f, -0.60f, 0.54f));
 	}
 
-	virtual bool OverlapAny_SpheresVsPlanetSide::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		mRepX = CreateRepXContext("Planetside_Statics.repx", 1.0f, false);
@@ -659,7 +682,7 @@ START_SQ_TEST(OverlapAny_SpheresVsPlanetSide, CATEGORY_OVERLAP, gDesc_OverlapAny
 		return true;
 	}
 
-	virtual bool OverlapAny_SpheresVsPlanetSide::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps || !caps.mSupportMeshes)
 			return false;
@@ -667,10 +690,9 @@ START_SQ_TEST(OverlapAny_SpheresVsPlanetSide, CATEGORY_OVERLAP, gDesc_OverlapAny
 		return AddToPint(pint, mRepX);
 	}
 
-	virtual void OverlapAny_SpheresVsPlanetSide::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
-		mCurrentTime += 1.0f/60.0f;
-		TestBase::CommonUpdate();
+		TestBase::CommonUpdate(dt);
 		udword Nb = GetNbRegisteredSphereOverlaps();
 		PintSphereOverlapData* Data = GetRegisteredSphereOverlaps();
 		const float Radius = 1.0f+(1.0f + sinf(mCurrentTime*1.0f))*5.0f;
@@ -681,7 +703,7 @@ START_SQ_TEST(OverlapAny_SpheresVsPlanetSide, CATEGORY_OVERLAP, gDesc_OverlapAny
 		}
 	}
 
-	virtual udword OverlapAny_SpheresVsPlanetSide::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchSphereOverlaps(*this, pint, OVERLAP_ANY);
 	}
@@ -694,18 +716,18 @@ static const char* gDesc_OverlapAny_BoxesVsPlanetSide = "OVERLAP_ANY: 4096 boxes
 
 START_SQ_TEST(OverlapAny_BoxesVsPlanetSide, CATEGORY_OVERLAP, gDesc_OverlapAny_BoxesVsPlanetSide)
 
-	virtual bool OverlapAny_BoxesVsPlanetSide::IsPrivate()	const
+	virtual bool	IsPrivate()	const
 	{
 		return true;
 	}
 
-	virtual void OverlapAny_BoxesVsPlanetSide::GetSceneParams(PINT_WORLD_CREATE& desc)
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
 	{
 		TestBase::GetSceneParams(desc);
 		desc.mCamera[0] = CameraPose(Point(-480.68f, 1639.54f, -443.50f), Point(0.59f, -0.60f, 0.54f));
 	}
 
-	virtual bool OverlapAny_BoxesVsPlanetSide::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		mRepX = CreateRepXContext("Planetside_Statics.repx", 1.0f, false);
@@ -730,7 +752,7 @@ START_SQ_TEST(OverlapAny_BoxesVsPlanetSide, CATEGORY_OVERLAP, gDesc_OverlapAny_B
 		return true;
 	}
 
-	virtual bool OverlapAny_BoxesVsPlanetSide::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportBoxOverlaps || !caps.mSupportMeshes)
 			return false;
@@ -738,10 +760,10 @@ START_SQ_TEST(OverlapAny_BoxesVsPlanetSide, CATEGORY_OVERLAP, gDesc_OverlapAny_B
 		return AddToPint(pint, mRepX);
 	}
 
-/*	virtual void OverlapAny_BoxesVsPlanetSide::CommonUpdate()
+/*	virtual void	CommonUpdate(float dt)
 	{
-		mCurrentTime += 1.0f/60.0f;
-		TestBase::CommonUpdate();
+		mCurrentTime += dt;
+		TestBase::CommonUpdate(dt);
 		udword Nb = GetNbRegisteredSphereOverlaps();
 		PintSphereOverlapData* Data = GetRegisteredSphereOverlaps();
 		const float Radius = 1.0f+(1.0f + sinf(mCurrentTime*1.0f))*5.0f;
@@ -752,7 +774,7 @@ START_SQ_TEST(OverlapAny_BoxesVsPlanetSide, CATEGORY_OVERLAP, gDesc_OverlapAny_B
 		}
 	}*/
 
-	virtual udword OverlapAny_BoxesVsPlanetSide::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchBoxOverlaps(*this, pint, OVERLAP_ANY);
 	}
@@ -765,13 +787,13 @@ static const char* gDesc_OverlapObjects_SpheresVsKP = "OVERLAP_OBJECTS: 4096 sph
 
 START_SQ_TEST(OverlapObjects_SpheresVsKP, CATEGORY_OVERLAP, gDesc_OverlapObjects_SpheresVsKP)
 
-	virtual void OverlapObjects_SpheresVsKP::GetSceneParams(PINT_WORLD_CREATE& desc)
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
 	{
 		TestBase::GetSceneParams(desc);
 		desc.mCamera[0] = CameraPose(Point(1085.22f, 3963.36f, -9239.41f), Point(-0.59f, -0.59f, 0.56f));
 	}
 
-	virtual bool OverlapObjects_SpheresVsKP::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadMeshesFromFile_(*this, "kp.bin");
@@ -795,7 +817,7 @@ START_SQ_TEST(OverlapObjects_SpheresVsKP, CATEGORY_OVERLAP, gDesc_OverlapObjects
 		return true;
 	}
 
-	virtual bool OverlapObjects_SpheresVsKP::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps)
 			return false;
@@ -803,7 +825,7 @@ START_SQ_TEST(OverlapObjects_SpheresVsKP, CATEGORY_OVERLAP, gDesc_OverlapObjects
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword OverlapObjects_SpheresVsKP::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchSphereOverlaps(*this, pint, OVERLAP_OBJECTS);
 	}
@@ -816,13 +838,13 @@ static const char* gDesc_OverlapObjects_GiantSphereVsKP = "OVERLAP_OBJECTS: one 
 
 START_SQ_TEST(OverlapObjects_GiantSphereVsKP, CATEGORY_OVERLAP, gDesc_OverlapObjects_GiantSphereVsKP)
 
-	virtual void OverlapObjects_GiantSphereVsKP::GetSceneParams(PINT_WORLD_CREATE& desc)
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
 	{
 		TestBase::GetSceneParams(desc);
 		desc.mCamera[0] = CameraPose(Point(926.05f, 933.78f, 523.28f), Point(-0.03f, -0.00f, -1.00f));
 	}
 
-	virtual bool OverlapObjects_GiantSphereVsKP::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadMeshesFromFile_(*this, "kp.bin");
@@ -838,10 +860,9 @@ START_SQ_TEST(OverlapObjects_GiantSphereVsKP, CATEGORY_OVERLAP, gDesc_OverlapObj
 		return true;
 	}
 
-	virtual void OverlapObjects_GiantSphereVsKP::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
-		mCurrentTime += 1.0f/60.0f;
-		TestBase::CommonUpdate();
+		TestBase::CommonUpdate(dt);
 		udword Nb = GetNbRegisteredSphereOverlaps();
 		PintSphereOverlapData* Data = GetRegisteredSphereOverlaps();
 		const float Radius = 0.1f+(1.0f + sinf(mCurrentTime*1.0f))*1250.0f;
@@ -852,7 +873,7 @@ START_SQ_TEST(OverlapObjects_GiantSphereVsKP, CATEGORY_OVERLAP, gDesc_OverlapObj
 		}
 	}
 
-	virtual bool OverlapObjects_GiantSphereVsKP::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps)
 			return false;
@@ -860,7 +881,7 @@ START_SQ_TEST(OverlapObjects_GiantSphereVsKP, CATEGORY_OVERLAP, gDesc_OverlapObj
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword OverlapObjects_GiantSphereVsKP::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchSphereOverlaps(*this, pint, OVERLAP_OBJECTS);
 	}
@@ -873,13 +894,13 @@ static const char* gDesc_OverlapObjects_GiantBoxVsKP = "OVERLAP_OBJECTS: one sin
 
 START_SQ_TEST(OverlapObjects_GiantBoxVsKP, CATEGORY_OVERLAP, gDesc_OverlapObjects_GiantBoxVsKP)
 
-	virtual void OverlapObjects_GiantBoxVsKP::GetSceneParams(PINT_WORLD_CREATE& desc)
+	virtual void	GetSceneParams(PINT_WORLD_CREATE& desc)
 	{
 		TestBase::GetSceneParams(desc);
 		desc.mCamera[0] = CameraPose(Point(926.05f, 933.78f, 523.28f), Point(-0.03f, -0.00f, -1.00f));
 	}
 
-	virtual bool OverlapObjects_GiantBoxVsKP::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 		LoadMeshesFromFile_(*this, "kp.bin");
@@ -897,10 +918,9 @@ START_SQ_TEST(OverlapObjects_GiantBoxVsKP, CATEGORY_OVERLAP, gDesc_OverlapObject
 		return true;
 	}
 
-	virtual void OverlapObjects_GiantBoxVsKP::CommonUpdate()
+	virtual void	CommonUpdate(float dt)
 	{
-		mCurrentTime += 1.0f/60.0f;
-		TestBase::CommonUpdate();
+		TestBase::CommonUpdate(dt);
 		udword Nb = GetNbRegisteredBoxOverlaps();
 		PintBoxOverlapData* Data = GetRegisteredBoxOverlaps();
 		const float Radius = 0.1f+(1.0f + sinf(mCurrentTime*1.0f))*1250.0f;
@@ -911,7 +931,7 @@ START_SQ_TEST(OverlapObjects_GiantBoxVsKP, CATEGORY_OVERLAP, gDesc_OverlapObject
 		}
 	}
 
-	virtual bool OverlapObjects_GiantBoxVsKP::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportBoxOverlaps)
 			return false;
@@ -919,7 +939,7 @@ START_SQ_TEST(OverlapObjects_GiantBoxVsKP, CATEGORY_OVERLAP, gDesc_OverlapObject
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword OverlapObjects_GiantBoxVsKP::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchBoxOverlaps(*this, pint, OVERLAP_OBJECTS);
 	}
@@ -932,7 +952,7 @@ static const char* gDesc_SphereOverlapTriangles_TestZone = "MIDPHASE: TestZone. 
 
 START_SQ_TEST(SphereOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_SphereOverlapTriangles_TestZone)
 
-	virtual bool SphereOverlapTriangles_TestZone::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -942,7 +962,7 @@ START_SQ_TEST(SphereOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_SphereOve
 		return true;
 	}
 
-	virtual bool SphereOverlapTriangles_TestZone::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps)
 			return false;
@@ -950,7 +970,7 @@ START_SQ_TEST(SphereOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_SphereOve
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword SphereOverlapTriangles_TestZone::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		PintObjectHandle MeshHandle = pint.mOMHelper->GetObject(0);
 
@@ -971,7 +991,7 @@ static const char* gDesc_BoxOverlapTriangles_TestZone = "MIDPHASE: TestZone. Box
 
 START_SQ_TEST(BoxOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_BoxOverlapTriangles_TestZone)
 
-	virtual bool BoxOverlapTriangles_TestZone::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -981,7 +1001,7 @@ START_SQ_TEST(BoxOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_BoxOverlapTr
 		return true;
 	}
 
-	virtual bool BoxOverlapTriangles_TestZone::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportBoxOverlaps)
 			return false;
@@ -989,7 +1009,7 @@ START_SQ_TEST(BoxOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_BoxOverlapTr
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword BoxOverlapTriangles_TestZone::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		PintObjectHandle MeshHandle = pint.mOMHelper->GetObject(0);
 
@@ -1008,7 +1028,7 @@ static const char* gDesc_CapsuleOverlapTriangles_TestZone = "MIDPHASE: TestZone.
 
 START_SQ_TEST(CapsuleOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_CapsuleOverlapTriangles_TestZone)
 
-	virtual bool CapsuleOverlapTriangles_TestZone::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1018,7 +1038,7 @@ START_SQ_TEST(CapsuleOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_CapsuleO
 		return true;
 	}
 
-	virtual bool CapsuleOverlapTriangles_TestZone::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportCapsuleOverlaps)
 			return false;
@@ -1026,7 +1046,7 @@ START_SQ_TEST(CapsuleOverlapTriangles_TestZone, CATEGORY_OVERLAP, gDesc_CapsuleO
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword CapsuleOverlapTriangles_TestZone::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		PintObjectHandle MeshHandle = pint.mOMHelper->GetObject(0);
 
@@ -1045,7 +1065,7 @@ static const char* gDesc_SphereOverlapAny_TestZone = "TestZone. Sphere overlap a
 
 START_SQ_TEST(SphereOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_SphereOverlapAny_TestZone)
 
-	virtual bool SphereOverlapAny_TestZone::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1070,7 +1090,7 @@ START_SQ_TEST(SphereOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_SphereOverlapAn
 		return true;
 	}
 
-	virtual bool SphereOverlapAny_TestZone::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportSphereOverlaps)
 			return false;
@@ -1078,7 +1098,7 @@ START_SQ_TEST(SphereOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_SphereOverlapAn
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword SphereOverlapAny_TestZone::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchSphereOverlaps(*this, pint, OVERLAP_ANY);
 	}
@@ -1091,7 +1111,7 @@ static const char* gDesc_BoxOverlapAny_TestZone = "TestZone. Box overlap any.";
 
 START_SQ_TEST(BoxOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_BoxOverlapAny_TestZone)
 
-	virtual bool BoxOverlapAny_TestZone::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1133,7 +1153,7 @@ START_SQ_TEST(BoxOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_BoxOverlapAny_Test
 		return true;
 	}
 
-	virtual bool BoxOverlapAny_TestZone::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportBoxOverlaps)
 			return false;
@@ -1141,7 +1161,7 @@ START_SQ_TEST(BoxOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_BoxOverlapAny_Test
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword BoxOverlapAny_TestZone::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchBoxOverlaps(*this, pint, OVERLAP_ANY);
 	}
@@ -1154,7 +1174,7 @@ static const char* gDesc_CapsuleOverlapAny_TestZone = "TestZone. Capsule overlap
 
 START_SQ_TEST(CapsuleOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_CapsuleOverlapAny_TestZone)
 
-	virtual bool CapsuleOverlapAny_TestZone::CommonSetup()
+	virtual bool	CommonSetup()
 	{
 		TestBase::CommonSetup();
 
@@ -1190,7 +1210,7 @@ START_SQ_TEST(CapsuleOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_CapsuleOverlap
 		return true;
 	}
 
-	virtual bool CapsuleOverlapAny_TestZone::Setup(Pint& pint, const PintCaps& caps)
+	virtual bool	Setup(Pint& pint, const PintCaps& caps)
 	{
 		if(!caps.mSupportCapsuleOverlaps)
 			return false;
@@ -1198,7 +1218,7 @@ START_SQ_TEST(CapsuleOverlapAny_TestZone, CATEGORY_OVERLAP, gDesc_CapsuleOverlap
 		return CreateMeshesFromRegisteredSurfaces(pint, caps, *this);
 	}
 
-	virtual udword CapsuleOverlapAny_TestZone::Update(Pint& pint)
+	virtual udword	Update(Pint& pint, float dt)
 	{
 		return DoBatchCapsuleOverlaps(*this, pint, OVERLAP_ANY);
 	}

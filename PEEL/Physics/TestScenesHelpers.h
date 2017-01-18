@@ -17,6 +17,8 @@
 	static const float gSQMaxDist = 1000.0f;
 //	static const float gSQMaxDist = 10.0f;
 
+	inline_	float OneOverNb(udword nb)	{ return nb>1 ? 1.0f / float(nb-1) : 0.0f;	}
+
 	class TestBase;
 	class SurfaceManager;
 
@@ -43,7 +45,7 @@
 
 	bool				CreateArrayOfDynamicConvexes		(Pint& pint, const PINT_CONVEX_CREATE& convex_create, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_y, const Point* offset=null, const Point* lin_vel=null);
 	bool				GenerateArrayOfSpheres				(Pint& pint, float radius, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_z, float mass=1.0f, PintCollisionGroup group=0, const Point* offset=null);
-	bool				GenerateArrayOfBoxes				(Pint& pint, const Point& extents, udword nb_x, udword nb_y, float altitude, float scale, float mass=1.0f, PintCollisionGroup group=0);
+	bool				GenerateArrayOfBoxes				(Pint& pint, const Point& extents, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_z, float mass=1.0f, PintCollisionGroup group=0, const Point* offset=null);
 	bool				GenerateArrayOfCapsules				(Pint& pint, float radius, float half_height, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_z, float mass=1.0f, PintCollisionGroup group=0, const Point* offset=null);
 	bool				GenerateArrayOfConvexes				(Pint& pint, const PintCaps& caps, bool is_static, float scale, udword nb_x, udword nb_y, udword convex_id);
 	bool				GenerateArrayOfObjects				(Pint& pint, const PintCaps& caps, PintShape type, udword type_data, udword nb_x, udword nb_y, float altitude, float scale, float mass);
@@ -53,9 +55,9 @@
 	bool				Setup_PotPourri_Raycasts			(Pint& pint, const PintCaps& caps, float mass, udword nb_layers, udword nb_x, udword nb_y);
 	bool				Setup_PotPourri_Raycasts			(TestBase& test, udword nb_rays, float max_dist);
 
-	bool				CreateMeshesFromRegisteredSurfaces	(Pint& pint, const PintCaps& caps, const TestBase& test);
+	bool				CreateMeshesFromRegisteredSurfaces	(Pint& pint, const PintCaps& caps, const TestBase& test, const PINT_MATERIAL_CREATE* material=null);
 
-	void				CreatePlanarMesh					(TestBase& test, Pint& pint, float altitude);
+	PintObjectHandle	CreatePlanarMesh					(TestBase& test, Pint& pint, float altitude, udword nb=32, float scale=0.1f, const PINT_MATERIAL_CREATE* material=null);
 
 	void				RegisterArrayOfRaycasts				(TestBase& test, udword nb_x, udword nb_y, float altitude, float scale_x, float scale_y, const Point& dir, float max_dist, const Point& offset);
 	bool				GenerateArrayOfVerticalRaycasts		(TestBase& test, float scale, udword nb_x, udword nb_y, float max_dist);
@@ -89,5 +91,34 @@
 	udword				DoBatchCapsuleOverlaps				(TestBase& test, Pint& pint, BatchOverlapMode mode);
 
 	void				LoadRaysFile						(TestBase& test, const char* filename, bool only_rays, bool no_processing=false);
+
+	#define MAX_LINKS	1024
+	//#define SETUP_ROPE_COLLISION_GROUPS
+	bool CreateCapsuleRope(	Pint& pint, PintObjectHandle articulation, PintObjectHandle parent,
+							float capsule_radius, float half_height, float capsule_mass, float capsule_mass_for_inertia,
+							const Point& capsule_dir, const Point& start_pos, udword nb_capsules,
+							bool create_distance_constraints, PintObjectHandle* handles, const PintCollisionGroup* collision_groups=null);
+	bool CreateCapsuleRope2(Pint& pint, float& half_height, PintObjectHandle articulation, PintObjectHandle parent,
+							const Point& p0, const Point& p1, udword nb_capsules,
+							float capsule_radius, float capsule_mass, float capsule_mass_for_inertia,
+							bool /*overlapping_links*/, bool create_distance_constraints, PintObjectHandle* handles, const PintCollisionGroup* collision_groups=null);
+
+	/////
+
+	struct CaterpillarTrackObjects
+	{
+		udword				mNbGears;
+		PintObjectHandle	mGears[4];
+		PintObjectHandle	mChassis;
+	};
+
+	class CylinderMesh;
+	// WIP & OLD!
+	void CreateCaterpillarTrack_OLD(Pint& pint, CaterpillarTrackObjects& objects, PINT_MATERIAL_CREATE* material, const Point& pos,
+						 const CylinderMesh& mCylinder, PintShapeRenderer* cylinder_renderer,
+						 const CylinderMesh& mCylinder2, PintShapeRenderer* cylinder_renderer2
+						 );
+
+	bool ClampAngularVelocity(Pint& pint, PintObjectHandle wheel_parent, PintObjectHandle wheel, float max_velocity);
 
 #endif

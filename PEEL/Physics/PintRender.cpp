@@ -13,7 +13,7 @@
 static inline_ void DrawImpact(const PintRaycastHit& hit)
 {
 	DrawFrame(hit.mImpact, 1.0f);
-	::DrawLine(hit.mImpact, hit.mImpact + hit.mNormal, Point(1.0f, 1.0f, 1.0f), 2.0f);
+	::DrawLine(hit.mImpact, hit.mImpact + hit.mNormal, Point(1.0f, 1.0f, 1.0f));
 }
 
 static void DrawWireframeBox(const OBB& box, const Point& offset, const Point& color)
@@ -75,6 +75,16 @@ void BasicRenderer::DrawSphere(float radius, const PR& pose)
 void BasicRenderer::DrawBox(const Point& extents, const PR& pose)
 {
 	::DrawBox(extents, pose);
+}
+
+void BasicRenderer::DrawCapsule(float r, float h, const PR& pose)
+{
+	::DrawCapsule(r, h, pose);
+}
+
+void BasicRenderer::DrawCylinder(float r, float h, const PR& pose)
+{
+	::DrawCylinder(r, h, pose);
 }
 
 void BasicRenderer::DrawRaycastData(udword nb, const PintRaycastData* raycast_data, const PintRaycastHit* hits, const Point& color)

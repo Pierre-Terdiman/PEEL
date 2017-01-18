@@ -15,9 +15,6 @@
 
 #include <vector>
 
-// Put whatever is needed here to make PINT_CommonHavok.cpp compile
-#include "PINT_Havok2012_2_0.h"
-
 #define HK_CONFIG_SIMD HK_CONFIG_SIMD_ENABLED
 
 #include <Common/Base/hkBase.h>
@@ -47,6 +44,7 @@
 #include <Physics/Collide/Shape/Convex/Box/hkpBoxShape.h>					
 #include <Physics/Collide/Shape/Convex/Sphere/hkpSphereShape.h>		
 #include <Physics/Collide/Shape/Convex/Capsule/hkpCapsuleShape.h>		
+#include <Physics/Collide/Shape/Convex/Cylinder/hkpCylinderShape.h>		
 #include <Physics/Collide/Shape/Convex/ConvexVertices/hkpConvexVerticesShape.h>
 #include <Physics/Collide/Shape/Compound\Collection\ExtendedMeshShape/hkpExtendedMeshShape.h>
 #include <Physics/Collide/Shape/Compound\Collection\StorageExtendedMesh/hkpStorageExtendedMeshShape.h>
@@ -103,3 +101,12 @@
 
 //#include <Physics/Collide/Agent/hkpCollisionAgentConfig.h>
 
+///
+
+#include <Physics/Dynamics/Constraint/Chain/hkpConstraintChainInstance.h>
+#include <Physics/Dynamics/Constraint/Chain/BallSocket/hkpBallSocketChainData.h>
+#include <Physics/Dynamics/Constraint/Chain/StiffSpring/hkpStiffSpringChainData.h>
+#include <Physics/Dynamics/Constraint/Chain/Powered/hkpPoweredChainData.h>
+
+// Put whatever is needed here to make PINT_CommonHavok.cpp compile
+#include "PINT_Havok2012_2_0.h"

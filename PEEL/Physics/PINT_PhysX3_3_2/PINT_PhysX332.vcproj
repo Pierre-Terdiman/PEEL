@@ -635,6 +635,14 @@
 					>
 				</File>
 				<File
+					RelativePath="..\PINT_Common\PINT_CommonPhysX3_Vehicles.cpp"
+					>
+				</File>
+				<File
+					RelativePath="..\PINT_Common\PINT_CommonPhysX3_Vehicles.h"
+					>
+				</File>
+				<File
 					RelativePath="..\PINT_Common\PINT_Ice.h"
 					>
 				</File>

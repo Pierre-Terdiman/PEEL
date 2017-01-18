@@ -11,6 +11,21 @@
 
 	struct PintRaycastData;
 
+	struct CameraData
+	{
+		CameraData() : mCurrentCameraIndex(0), mNbSceneCameras(0)	{}
+		udword		mCurrentCameraIndex;
+		udword		mNbSceneCameras;
+		CameraPose	mCameraPose[PINT_MAX_CAMERA_POSES];
+
+		bool		operator == (const CameraData& other)	const;
+
+		void		Init(const PINT_WORLD_CREATE& desc);
+		void		Reset();
+		void		SelectNextCamera();
+		void		SelectPreviousCamera();
+	};
+
 	class CameraManager
 	{
 		public:

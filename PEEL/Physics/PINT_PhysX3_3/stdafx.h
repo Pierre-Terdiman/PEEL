@@ -18,4 +18,7 @@
 #include "PxPhysicsAPI.h"
 using namespace physx;
 
-#define SUPPORT_SHARED_SHAPES
+#define PHYSX_SUPPORT_SHARED_SHAPES
+#define PHYSX_SUPPORT_PX_BROADPHASE_TYPE
+
+typedef PxPruningStructure	PhysxPruningStructure;

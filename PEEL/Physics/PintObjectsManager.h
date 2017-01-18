@@ -11,23 +11,23 @@
 
 #include "Pint.h"
 
-//### we can't store the objects in the test class since we have N pint-dependent versions of them
+//### we can't store the objects in the test class since we have N Pint-dependent versions of them
 // it's the same problem as for phantoms, and what gave birth to PintSQ. Maybe rename "PintSQ" to "PintHelper"?
 	class ObjectsManager
 	{
 		public:
-										ObjectsManager();
-		virtual							~ObjectsManager();
+									ObjectsManager();
+		virtual						~ObjectsManager();
 
-				void					Init(Pint* owner);
+				void				Init(Pint* owner);
 
-				udword					GetNbObjects()		const;
-				PintObjectHandle		GetObject(udword i)	const;
-				void					AddObject(PintObjectHandle object);
-				void					Reset();
+				udword				GetNbObjects()		const;
+				PintObjectHandle	GetObject(udword i)	const;
+				void				AddObject(PintObjectHandle object);
+				void				Reset();
 		private:
-				Pint*					mOwner;
-				Container				mObjects;
+				Pint*				mOwner;
+				Container			mObjects;
 	};
 
 	inline_ PintObjectHandle CreatePintObject(Pint& pint, const PINT_OBJECT_CREATE& desc)

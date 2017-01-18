@@ -24,7 +24,7 @@ static			float	gLinearDamping					= 0.1f;
 static			float	gAngularDamping					= 0.05f;
 static			float	gErp							= 0.2f;
 static			float	gErp2							= 0.1f;
-static			float	gCollisionMargin				= 0.04f;
+static			float	gCollisionMargin				= 0.005f;
 static			bool	gUseSplitImpulse				= false;
 static			bool	gRandomizeOrder					= false;
 static			bool	gWarmStarting					= true;
@@ -262,7 +262,8 @@ Bullet::~Bullet()
 void Bullet::GetCaps(PintCaps& caps) const
 {
 	caps.mSupportRigidBodySimulation	= true;
-	caps.mSupportKinematics				= false;
+	caps.mSupportMassForInertia			= true;
+	caps.mSupportCylinders				= true;
 	caps.mSupportCollisionGroups		= true;
 	caps.mSupportCompounds				= true;
 	caps.mSupportConvexes				= true;
@@ -271,16 +272,11 @@ void Bullet::GetCaps(PintCaps& caps) const
 	caps.mSupportHingeJoints			= true;
 	caps.mSupportFixedJoints			= true;
 	caps.mSupportPrismaticJoints		= true;
-	caps.mSupportPhantoms				= false;
 	caps.mSupportRaycasts				= true;
 	caps.mSupportBoxSweeps				= true;
 	caps.mSupportSphereSweeps			= true;
 	caps.mSupportCapsuleSweeps			= true;
 	caps.mSupportConvexSweeps			= true;
-	caps.mSupportSphereOverlaps			= false;
-	caps.mSupportBoxOverlaps			= false;
-	caps.mSupportCapsuleOverlaps		= false;
-	caps.mSupportConvexOverlaps			= false;
 }
 
 void Bullet::Init(const PINT_WORLD_CREATE& desc)
@@ -375,6 +371,14 @@ void Bullet::Close()
 {
 	//cleanup in the reverse order of creation/initialization
 
+	//delete constraints
+	for(udword j=0;j<mConstraints.size();j++)
+	{
+		btTypedConstraint* c = mConstraints[j];
+		mDynamicsWorld->removeConstraint(c);
+		DELETESINGLE(c);
+	}
+
 	//remove the rigidbodies from the dynamics world and delete them
 	int i;
 	for(i=mDynamicsWorld->getNumCollisionObjects()-1; i>=0 ;i--)
@@ -460,11 +464,6 @@ static void DrawLeafShape(PintRender& renderer, const btCollisionShape* shape, c
 	}*/
 }
 
-Point Bullet::GetMainColor()
-{
-	return Point(1.0f, 1.0f, 0.4f);
-}
-
 void Bullet::Render(PintRender& renderer)
 {
 	const int size = mDynamicsWorld->getNumCollisionObjects();
@@ -516,9 +515,7 @@ btSphereShape* Bullet::FindSphereShape(const PINT_SPHERE_CREATE& create)
 		{
 			btSphereShape* CurrentShape = mSphereShapes[i];
 			if(CurrentShape->getRadius()==Radius)
-			{
 				return CurrentShape;
-			}
 		}
 	}
 
@@ -544,9 +541,7 @@ btBoxShape* Bullet::FindBoxShape(const PINT_BOX_CREATE& create)
 			if(		CurrentShape.mExtents.x==create.mExtents.x
 				&&	CurrentShape.mExtents.y==create.mExtents.y
 				&&	CurrentShape.mExtents.z==create.mExtents.z)
-			{
 				return CurrentShape.mShape;
-			}
 		}
 	}
 
@@ -575,15 +570,39 @@ btCapsuleShape* Bullet::FindCapsuleShape(const PINT_CAPSULE_CREATE& create)
 		{
 			btCapsuleShape* CurrentShape = mCapsuleShapes[i];
 			if(CurrentShape->getRadius()==Radius && CurrentShape->getHalfHeight()==HalfHeight)
-			{
 				return CurrentShape;
-			}
 		}
 	}
 
 	btCapsuleShape* shape = new btCapsuleShape(Radius, HalfHeight*2.0f);
 	ASSERT(shape);
 	mCapsuleShapes.push_back(shape);
+	mCollisionShapes.push_back(shape);
+
+	if(create.mRenderer)
+		shape->setUserPointer(create.mRenderer);
+
+	return shape;
+}
+
+btCylinderShape* Bullet::FindCylinderShape(const PINT_CYLINDER_CREATE& create)
+{
+	const float Radius = create.mRadius;
+	const float HalfHeight = create.mHalfHeight;
+	if(gShareShapes)
+	{
+		const int size = mCylinderShapes.size();
+		for(int i=0;i<size;i++)
+		{
+			btCylinderShape* CurrentShape = mCylinderShapes[i];
+			if(CurrentShape->getRadius()==Radius && CurrentShape->getHalfExtentsWithMargin().y()==HalfHeight)
+				return CurrentShape;
+		}
+	}
+
+	btCylinderShape* shape = new btCylinderShape(btVector3(Radius, HalfHeight, Radius));
+	ASSERT(shape);
+	mCylinderShapes.push_back(shape);
 	mCollisionShapes.push_back(shape);
 
 	if(create.mRenderer)
@@ -601,9 +620,7 @@ btConvexHullShape* Bullet::FindConvexShape(const PINT_CONVEX_CREATE& create)
 		{
 			btConvexHullShape* CurrentShape = mConvexShapes[i];
 			if(CurrentShape->getUserPointer()==create.mRenderer)
-			{
 				return CurrentShape;
-			}
 		}
 	}
 
@@ -635,6 +652,11 @@ btCollisionShape* Bullet::CreateBulletShape(const PINT_SHAPE_CREATE& desc)
 	{
 		const PINT_CAPSULE_CREATE& CapsuleCreate = static_cast<const PINT_CAPSULE_CREATE&>(desc);
 		BulletShape = FindCapsuleShape(CapsuleCreate);
+	}
+	else if(desc.mType==PINT_SHAPE_CYLINDER)
+	{
+		const PINT_CYLINDER_CREATE& CylinderCreate = static_cast<const PINT_CYLINDER_CREATE&>(desc);
+		BulletShape = FindCylinderShape(CylinderCreate);
 	}
 	else if(desc.mType==PINT_SHAPE_CONVEX)
 	{
@@ -676,13 +698,14 @@ btCollisionShape* Bullet::CreateBulletShape(const PINT_SHAPE_CREATE& desc)
 		if(desc.mRenderer)
 			shape->setUserPointer(desc.mRenderer);
 
-		shape->setMargin(gCollisionMargin);
-
 		BulletShape = shape;
 	}
-
 	else ASSERT(0);
 
+	if(BulletShape)
+	{
+		BulletShape->setMargin(gCollisionMargin);
+	}
 	return BulletShape;
 }
 
@@ -740,7 +763,7 @@ PintObjectHandle Bullet::CreateObject(const PINT_OBJECT_CREATE& desc)
 
 	btVector3 localInertia(0,0,0);
 	if(isDynamic)
-		colShape->calculateLocalInertia(desc.mMass, localInertia);
+		colShape->calculateLocalInertia(desc.mMassForInertia<0.0f ? desc.mMass : desc.mMassForInertia, localInertia);
 
 	const btTransform startTransform(ToBtQuaternion(desc.mRotation), ToBtVector3(desc.mPosition));
 
@@ -941,8 +964,12 @@ PintJointHandle Bullet::CreateJoint(const PINT_JOINT_CREATE& desc)
 			btSliderConstraint* sc = new btSliderConstraint(	*body0, *body1,
 																frameInA, frameInB,
 																false);
-//			sc->setUpperLinLimit(10.0f);
-//			sc->setLowerLinLimit(-10.0f);
+
+/*			if(jc.mMinLimit<=jc.mMaxLimit)
+			{
+				sc->setUpperLinLimit(jc.mMaxLimit);
+				sc->setLowerLinLimit(jc.mMinLimit);
+			}*/
 
 			constraint = sc;
 		}
@@ -950,8 +977,10 @@ PintJointHandle Bullet::CreateJoint(const PINT_JOINT_CREATE& desc)
 	}
 
 	if(constraint)
+	{
 		mDynamicsWorld->addConstraint(constraint, true);
-
+		mConstraints.push_back(constraint);
+	}
 	return constraint;
 }
 

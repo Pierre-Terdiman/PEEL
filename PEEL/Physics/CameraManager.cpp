@@ -7,9 +7,68 @@
 ///////////////////////////////////////////////////////////////////////////////
 
 #include "stdafx.h"
+#include "Pint.h"
 #include "CameraManager.h"
 #include "Camera.h"
-#include "Pint.h"
+
+void CameraData::Init(const PINT_WORLD_CREATE& desc)
+{
+	mCurrentCameraIndex = 0;
+	mNbSceneCameras = 0;
+	mCameraPose[0] = desc.mCamera[0];
+	CameraPose Default;
+	for(udword i=1;i<PINT_MAX_CAMERA_POSES;i++)
+	{
+		const CameraPose& CP = desc.mCamera[i];
+		mCameraPose[i] = CP;
+		if(CP!=desc.mCamera[i-1] && CP!=Default)
+			mNbSceneCameras++;
+	}
+}
+
+void CameraData::Reset()
+{
+	mCurrentCameraIndex = 0;
+	SetCamera(mCameraPose[0].mPos, mCameraPose[0].mDir);
+}
+
+void CameraData::SelectNextCamera()
+{
+	if(mNbSceneCameras)
+	{
+		if(mCurrentCameraIndex!=mNbSceneCameras)
+			mCurrentCameraIndex++;
+		SetCamera(mCameraPose[mCurrentCameraIndex].mPos, mCameraPose[mCurrentCameraIndex].mDir);
+	}
+}
+
+void CameraData::SelectPreviousCamera()
+{
+	if(mNbSceneCameras)
+	{
+		if(mCurrentCameraIndex)
+			mCurrentCameraIndex--;
+		SetCamera(mCameraPose[mCurrentCameraIndex].mPos, mCameraPose[mCurrentCameraIndex].mDir);
+	}
+}
+
+bool CameraData::operator == (const CameraData& other) const
+{
+	if(mNbSceneCameras!=other.mNbSceneCameras)
+		return false;
+
+	for(udword i=0;i<PINT_MAX_CAMERA_POSES;i++)
+	{
+		if(!(mCameraPose[i]==other.mCameraPose[i]))
+			return false;
+	}
+	return true;
+}
+
+
+
+
+
 
 CameraManager::CameraManager() : mNbFrames(0), mNbCameraPoses(0), mCameraPoses(null)
 {
@@ -78,17 +137,9 @@ void CameraManager::UpdateCameraPose()
 
 extern udword gScreenWidth;
 extern udword gScreenHeight;
-Point ComputeWorldRay(const GLint viewPort[4], const GLdouble modelMatrix[16], const GLdouble projMatrix[16], int xs, int ys);
 
 void CameraManager::GenerateRays(PintRaycastData* rays, udword nb_rays, float max_dist)
 {
-	GLint viewPort[4];
-	GLdouble modelMatrix[16];
-	GLdouble projMatrix[16];
-	glGetIntegerv(GL_VIEWPORT, viewPort);
-	glGetDoublev(GL_MODELVIEW_MATRIX, modelMatrix);
-	glGetDoublev(GL_PROJECTION_MATRIX, projMatrix);
-
 	const float fScreenWidth = float(gScreenWidth)/float(nb_rays);
 	const float fScreenHeight = float(gScreenHeight)/float(nb_rays);
 	const Point Origin = GetCameraPos();
@@ -101,7 +152,7 @@ void CameraManager::GenerateRays(PintRaycastData* rays, udword nb_rays, float ma
 		{
 			const udword xi = udword(fScreenWidth*float(i));
 			rays[Offset].mOrigin = Origin;
-			rays[Offset].mDir = ComputeWorldRay(viewPort, modelMatrix, projMatrix, xi, yi);
+			rays[Offset].mDir = ComputeWorldRay(xi, yi);
 			rays[Offset].mMaxDist = max_dist;
 			Offset++;
 		}

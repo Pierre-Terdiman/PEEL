@@ -69,69 +69,6 @@ void SkeletonPint::SetDisabledGroups(udword nb_groups, const PintDisabledGroups*
 {
 }
 
-void* SkeletonPint::CreatePhantom(const AABB& box)
-{
-	return null;
-}
-
-udword SkeletonPint::BatchRaycastsPhantom(udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts, void** phantoms)
-{
-	return 0;
-}
-
-udword SkeletonPint::BatchRaycasts(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts)
-{
-	return 0;
-}
-
-udword SkeletonPint::BatchBoxSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintBoxSweepData* sweeps)
-{
-	return 0;
-}
-
-udword SkeletonPint::BatchSphereSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintSphereSweepData* sweeps)
-{
-	return 0;
-}
-
-udword SkeletonPint::BatchCapsuleSweeps(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintCapsuleSweepData* sweeps)
-{
-	return 0;
-}
-
-udword SkeletonPint::BatchSphereOverlapAny(PintSQThreadContext context, udword nb, PintBooleanHit* dest, const PintSphereOverlapData* overlaps)
-{
-	return 0;
-}
-
-udword SkeletonPint::BatchSphereOverlapObjects(PintSQThreadContext context, udword nb, PintOverlapObjectHit* dest, const PintSphereOverlapData* overlaps)
-{
-	return 0;
-}
-
-PR SkeletonPint::GetWorldTransform(PintObjectHandle handle)
-{
-	return PR();
-}
-
-void SkeletonPint::ApplyActionAtPoint(PintObjectHandle handle, PintActionType action_type, const Point& action, const Point& pos)
-{
-}
-
-udword SkeletonPint::GetShapes(PintObjectHandle* shapes, PintObjectHandle handle)
-{
-	return 0;
-}
-
-void SkeletonPint::SetLocalRot(PintObjectHandle handle, const Quat& q)
-{
-}
-
-bool SkeletonPint::GetConvexData(PintObjectHandle handle, PINT_CONVEX_CREATE& data)
-{
-	return false;
-}
-
 
 static SkeletonPint* gSkeleton = null;
 

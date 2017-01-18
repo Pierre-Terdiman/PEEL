@@ -9,13 +9,13 @@
 #ifndef CUSTOM_ICE_ALLOCATOR_H
 #define CUSTOM_ICE_ALLOCATOR_H
 
-	class MyIceAllocator : public Allocator
+	class CustomIceAllocator : public Allocator
 	{
 		public:
-		MyIceAllocator() : mCurrentNbAllocs(0)
+		CustomIceAllocator() : mCurrentNbAllocs(0)
 		{
 		}
-		virtual ~MyIceAllocator()
+		virtual ~CustomIceAllocator()
 		{
 			if(mCurrentNbAllocs)
 				printf("MyIceAllocator: %d memory leaks detected...\n", mCurrentNbAllocs);

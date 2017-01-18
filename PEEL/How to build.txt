@@ -1,0 +1,146 @@
+
+How to build PEEL:
+==================
+
+You will need VC9 (i.e. Visual Studio 2008). Just open the provided .sln file and PEEL should compile
+out-of-the-box. It will put the binary in the .\PEEL\Build\ folder.
+
+If you do not have VC9, you might be able to do an automatic project conversion with a more recent
+version of Visual Studio. Some people reported some success doing so.
+
+However the most recent versions will complain about the "override" keyword being used in ICE headers,
+and fail compiling. I did not investigate this yet but a fix might be tedious.
+
+Providing native support for more recent VS versions is on my TODO list. But then again, so are a
+thousand other things.
+
+
+How to build the PINT plugins:
+==============================
+
+You will need to find and download the physics engines' headers and binaries, and put them in the
+appropriate folders in the .\PEEL_Externals\ folder. Here are rough guidelines how to do so:
+
+
+Bullet:
+------
+
+	Go to the Bullet website, download the version you're interested in, compile it independently. Then
+	copy all the files in, for example, the .\PEEL_Externals\bullet3-2.85.1\ folder. The structure should
+	look like this after that:
+
+	.\PEEL_Externals\bullet3-2.85.1\bin\
+	.\PEEL_Externals\bullet3-2.85.1\build3\
+	.\PEEL_Externals\bullet3-2.85.1\data\
+	.\PEEL_Externals\bullet3-2.85.1\docs\
+	.\PEEL_Externals\bullet3-2.85.1\examples\
+	.\PEEL_Externals\bullet3-2.85.1\Extras\
+	.\PEEL_Externals\bullet3-2.85.1\src\
+	.\PEEL_Externals\bullet3-2.85.1\test\
+	(etc)
+
+	Please check the Visual Studio include & link options to confirm where the files are included from,
+	and which libraries the various plugins are linking to. For VC9, I usually link against Bullet's VC10
+	static libraries. These are the ones you will need to independently build.
+
+
+Newton:
+------
+
+	Go to the Newton website, download the version you're interested in, compile it independently. Then
+	gather the headers & lib files, and copy them in, for example, the .\PEEL_Externals\Newton_3_14\
+	folder. WARNING: for Bullet I blindly copied all files, but for other engines I manually selected and
+	copied the relevant headers & lib files only. So the structure should look like this after that:
+	
+	.\PEEL_Externals\Newton_3_14\Include\
+	.\PEEL_Externals\Newton_3_14\Lib\
+	
+	And that's it, all .h files in the Include folder, all .lib files in the Lib folder, done.
+	
+	Please check the Visual Studio include & link options to confirm where the files are included from,
+	and which libraries the various plugins are linking to. For VC9, I usually link against Newton's VC10
+	static libraries. These are the ones you will need to independently build.
+
+
+Havok:
+------
+
+	I am not sure how to get the Havok libraries anymore, since they now stopped their "Try Havok" program.
+	
+	So one way or another, get your hands on the version you're interested in, compile it independently. Then
+	gather the headers & lib files, and copy them in, for example, the .\PEEL_Externals\Havok2014_1_0\
+	folder. WARNING: for Bullet I blindly copied all files, but for other engines I manually selected and
+	copied the relevant headers & lib files only. So the structure should look like this after that:
+	
+	.\PEEL_Externals\Havok2014_1_0\Lib\win32_vs2010\
+	.\PEEL_Externals\Havok2014_1_0\Source\
+	
+	The "Source" folder should be a copy of Havok's similarly named folder, same for Libs. Details may
+	vary from one Havok version to another but hopefully you get the idea.
+	
+	Please check the Visual Studio include & link options to confirm where the files are included from,
+	and which libraries the various plugins are linking to. For VC9, I usually link against Havok's VC10
+	static libraries. These are the ones you will need to independently build.
+
+PhysX:
+------
+
+	Follow the instructions here to get access to the code: https://developer.nvidia.com/physx-source-github
+	After that the code will be visible here:
+	https://github.com/NVIDIAGameWorks/PhysX-3.3
+	https://github.com/NVIDIAGameWorks/PhysX-3.4
+	(You will see a 404-error if you try to access them without a registered account).
+
+PhysX 3.3:
+---------
+
+	Compile the Visual Studio 2010 (VC10) version.
+
+	Then gather the headers & lib files, and copy them in, for example, the .\PEEL_Externals\PhysX-3.3.4\
+	folder. WARNING: for Bullet I blindly copied all files, but for other engines I manually selected and
+	copied the relevant headers & lib files only. So the structure should look like this after that:
+	
+	.\PEEL_Externals\PhysX-3.3.4\Include\
+	.\PEEL_Externals\PhysX-3.3.4\Lib\vc10win32\
+	.\PEEL_Externals\PhysX-3.3.4\Bin\vc10win32\
+	
+	The "Include" folder should be a copy of PhysX's similarly named folder, same for Libs. The Bin folder
+	contains PhysX's DLLs, which will be automatically copied (and renamed) to PEEL's build folder. This
+	process is necessary to be able to run multiple PhysX versions at the same time. It would be much easier
+	with static libs but PhysX wants DLLs.
+	
+	Please check the Visual Studio include & link options to confirm where the files are included from,
+	and which libraries the various plugins are linking to. For VC9, I usually link against PhysX's VC10
+	static libraries. These are the ones you will need to independently build.
+
+PhysX 3.4:
+---------
+
+	The situation is currently painful for PhysX 3.4, since it doesn't support VC10 libraries anymore.
+	Linking to the VC11 Win32 libs work, as long as it's the small stubs used to connect to the DLLs.
+	Linking to actual static libs (as needed for the PhysX 'extensions' library) does not work anymore (you
+	get link errors). So the current workaround was for me to copy the extensions source files directly in
+	the PINT plugins, and compile them there directly. I removed a bunch of things from them that I didn't
+	need, added some include to make them work with PCH, etc. As a result, there is no need to link to
+	PhysX's extensions library anymore. But it's a bit of a mess, that I'll try to improve for future
+	versions.
+	
+	Another difference is that I now include a changelist number everywhere, to make it clear which
+	3.4 build is used. For example at time of writing the 3.4 GitHub repository does not have any official
+	release, it's just the "master". Using a changelist number makes things a bit more explicit and clear
+	for me.
+	
+	And finally, another difference is that PhysX 3.4 now relies on an external lib called PxShared,
+	which complicates matters some more. That library also evolves independently, so here again adding
+	a changelist number helps me to know exactly which flavor of "PhysX 3.4" is used in PEEL.
+	
+	As a result, the current folder layout for 3.4 in PEEL looks like this:
+	
+	.\PEEL_Externals\CL_21562824\PhysX-3.4_Trunk\
+	.\PEEL_Externals\CL_21562824\PxShared\
+	
+	And the correct files must be copied in the correct place in these two main folders. I'm not sure
+	anybody will actually read these notes and try to recompile the PINT plugin for 3.4, so I'm not
+	going to go into much more details here. But if you need help, just contact me.
+	
+	
