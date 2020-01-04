@@ -182,6 +182,9 @@ ECHO Y | del Physics\PINT_PhysX3_3_Opc2_2\Debug\*.*
 ECHO Y | del Physics\PINT_PhysX3_3_Opc2_2\Release\*.*
 ECHO Y | del Physics\PINT_PhysX3_3_Opc2_2\Profile\*.*
 
+ECHO Y | del Physics\PINT_Bounce\Debug\*.*
+ECHO Y | del Physics\PINT_Bounce\Release\*.*
+
 ECHO Y | del Physics\PINT_Tokamak\Debug\*.*
 ECHO Y | del Physics\PINT_Tokamak\Release\*.*
 

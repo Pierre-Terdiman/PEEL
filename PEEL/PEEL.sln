@@ -57,6 +57,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PINT_Newton_3_12", "Physics
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PINT_PhysX34_CL_21578609", "Physics\PINT_PhysX3_4_CL_21578609\PINT_PhysX34_CL_21578609.vcproj", "{69D568D4-CE74-4091-9AF3-42D7C2489A64}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PINT_Bounce", "Physics\PINT_Bounce\PINT_Bounce.vcproj", "{9DDC9169-19C4-4696-B343-2A0869738C9D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Win32 = Debug|Win32
@@ -395,6 +397,15 @@ Global
 		{69D568D4-CE74-4091-9AF3-42D7C2489A64}.Release|Win32.Build.0 = Release|Win32
 		{69D568D4-CE74-4091-9AF3-42D7C2489A64}.Release|x64.ActiveCfg = Release|x64
 		{69D568D4-CE74-4091-9AF3-42D7C2489A64}.Release|x64.Build.0 = Release|x64
+		{9DDC9169-19C4-4696-B343-2A0869738C9D}.Debug|Win32.ActiveCfg = Debug|Win32
+		{9DDC9169-19C4-4696-B343-2A0869738C9D}.Debug|Win32.Build.0 = Debug|Win32
+		{9DDC9169-19C4-4696-B343-2A0869738C9D}.Debug|x64.ActiveCfg = Debug|Win32
+		{9DDC9169-19C4-4696-B343-2A0869738C9D}.Profile|Win32.ActiveCfg = Release|Win32
+		{9DDC9169-19C4-4696-B343-2A0869738C9D}.Profile|Win32.Build.0 = Release|Win32
+		{9DDC9169-19C4-4696-B343-2A0869738C9D}.Profile|x64.ActiveCfg = Release|Win32
+		{9DDC9169-19C4-4696-B343-2A0869738C9D}.Release|Win32.ActiveCfg = Release|Win32
+		{9DDC9169-19C4-4696-B343-2A0869738C9D}.Release|Win32.Build.0 = Release|Win32
+		{9DDC9169-19C4-4696-B343-2A0869738C9D}.Release|x64.ActiveCfg = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
