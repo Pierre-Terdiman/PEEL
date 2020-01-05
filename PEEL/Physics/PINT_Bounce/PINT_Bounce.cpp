@@ -97,8 +97,8 @@ void BouncePint::Render(PintRender& renderer)
 	b3Body* body = gWorld->GetBodyList().m_head;
 	while(body)
 	{
-		b3Vec3 position = body->GetPosition();
-		b3Quat orientation = body->GetOrientation();
+		const b3Vec3 position = body->GetPosition();
+		const b3Quat orientation = body->GetOrientation();
 
 		const PR IcePose(ToPoint(position), ToQuat(orientation));
 
@@ -149,16 +149,37 @@ PintObjectHandle BouncePint::CreateObject(const PINT_OBJECT_CREATE& desc)
 	{
 //		PxTransform LocalPose(ToPxVec3(CurrentShape->mLocalPos), ToPxQuat(CurrentShape->mLocalRot));
 
+		float restitution = 0.0f;
+		float friction = 1.0f;
+		if(CurrentShape->mMaterial)
+		{
+			restitution = CurrentShape->mMaterial->mRestitution;
+			friction = CurrentShape->mMaterial->mDynamicFriction;
+		}
+
 		b3Shape* shape = null;
 
 		if(CurrentShape->mType==PINT_SHAPE_SPHERE)
 		{
 			const PINT_SPHERE_CREATE* SphereCreate = static_cast<const PINT_SPHERE_CREATE*>(CurrentShape);
+
+			b3SphereShape bodyShape;
+			bodyShape.m_center.SetZero();
+			bodyShape.m_radius = SphereCreate->mRadius;
+
+			b3ShapeDef bodyBoxDef;
+			bodyBoxDef.shape = &bodyShape;
+			bodyBoxDef.density = desc.mMass;
+			bodyBoxDef.restitution = restitution;
+			bodyBoxDef.friction = friction;
+			bodyBoxDef.userData = CurrentShape->mRenderer;
+			shape = body->CreateShape(bodyBoxDef);
 		}
 		else if(CurrentShape->mType==PINT_SHAPE_BOX)
 		{
 			const PINT_BOX_CREATE* BoxCreate = static_cast<const PINT_BOX_CREATE*>(CurrentShape);
 
+			// TODO: fix leak
 //			b3BoxHull bodyBox(BoxCreate->mExtents.x, BoxCreate->mExtents.y, BoxCreate->mExtents.z);
 			b3BoxHull* bodyBox = new b3BoxHull(BoxCreate->mExtents.x, BoxCreate->mExtents.y, BoxCreate->mExtents.z);
 
@@ -169,8 +190,8 @@ PintObjectHandle BouncePint::CreateObject(const PINT_OBJECT_CREATE& desc)
 			b3ShapeDef bodyBoxDef;
 			bodyBoxDef.shape = &bodyShape;
 			bodyBoxDef.density = desc.mMass;
-			bodyBoxDef.restitution = 0.0f;
-			bodyBoxDef.friction = 1.0f;
+			bodyBoxDef.restitution = restitution;
+			bodyBoxDef.friction = friction;
 			bodyBoxDef.userData = CurrentShape->mRenderer;
 			shape = body->CreateShape(bodyBoxDef);
 		}
@@ -188,6 +209,9 @@ PintObjectHandle BouncePint::CreateObject(const PINT_OBJECT_CREATE& desc)
 		else ASSERT(0);
 
 		ASSERT(shape);
+		if(shape)
+		{
+		}
 
 		CurrentShape = CurrentShape->mNext;
 	}
@@ -220,6 +244,48 @@ void BouncePint::SetDisabledGroups(udword nb_groups, const PintDisabledGroups* g
 {
 }
 
+namespace
+{
+class MyRaycastFilter : public b3RayCastFilter
+{
+public:
+	virtual bool ShouldRayCast(b3Shape* shape)
+	{
+		return true;
+	}
+
+}gRaycastFilter;
+}
+
+udword BouncePint::BatchRaycasts(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts)
+{
+	ASSERT(gWorld);
+
+	udword NbHits = 0;
+	while(nb--)
+	{
+		const b3Vec3 p1 = ToB3Vec3(raycasts->mOrigin);
+		const b3Vec3 p2 = ToB3Vec3(raycasts->mOrigin + raycasts->mDir * raycasts->mMaxDist);
+
+		b3RayCastSingleOutput Hit;
+		if(gWorld->RayCastSingle(&Hit, &gRaycastFilter, p1, p2))
+		{
+			NbHits++;
+			dest->mObject = Hit.shape;
+			dest->mImpact = ToPoint(Hit.point);
+			dest->mNormal = ToPoint(Hit.normal);
+			dest->mDistance = Hit.fraction;
+		}
+		else
+		{
+			dest->mObject = null;
+		}
+
+		raycasts++;
+		dest++;
+	}
+	return NbHits;
+}
 
 static BouncePint* gBounce = null;
 

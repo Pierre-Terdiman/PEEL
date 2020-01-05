@@ -31,6 +31,8 @@
 		virtual	PintObjectHandle	CreateObject(const PINT_OBJECT_CREATE& desc);
 		virtual	bool				ReleaseObject(PintObjectHandle handle);
 		virtual	PintJointHandle		CreateJoint(const PINT_JOINT_CREATE& desc);
+
+		virtual	udword				BatchRaycasts(PintSQThreadContext context, udword nb, PintRaycastHit* dest, const PintRaycastData* raycasts);
 		//~Pint
 
 		private:
